@@ -31,5 +31,12 @@
 
     {% block content %}{% endblock %}
   </main>
+  <script>
+    document.addEventListener("click", e => {
+      if (!e.target.closest(".export-dropdown")) {
+        document.querySelectorAll(".export-menu.open").forEach(m => m.classList.remove("open"));
+      }
+    });
+  </script>
 </body>
 </html>

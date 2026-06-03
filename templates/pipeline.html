@@ -4,7 +4,18 @@
 {% block content %}
 <div class="page-header">
   <h1>Pipeline</h1>
-  <a href="{{ url_for('new_client') }}" class="btn btn-primary">+ New Deal</a>
+  <div style="display:flex;gap:8px;align-items:center">
+    <div class="export-dropdown">
+      <button class="btn btn-secondary" onclick="this.nextElementSibling.classList.toggle('open')">
+        ⬇ Export
+      </button>
+      <div class="export-menu">
+        <a href="{{ url_for('export_deals') }}">📋 Deals CSV</a>
+        <a href="{{ url_for('export_activities') }}">📅 Activities CSV</a>
+      </div>
+    </div>
+    <a href="{{ url_for('new_client') }}" class="btn btn-primary">+ New Deal</a>
+  </div>
 </div>
 
 {% set stage_emoji = {"new": "🔵", "contacted": "📞", "pitched": "🎯", "follow_up": "🔄", "negotiation": "🤝", "won": "🏆", "lost": "❌"} %}

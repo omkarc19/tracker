@@ -315,6 +315,21 @@ label { font-size: 12px; font-weight: 600; color: var(--text-sub); }
 /* hidden utility */
 .hidden { display: none !important; }
 
+/* ── Export dropdown ──────────────────────────────────────── */
+.export-dropdown { position: relative; }
+.export-menu {
+  display: none; position: absolute; right: 0; top: calc(100% + 6px);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: 0 4px 12px rgba(0,0,0,.1);
+  min-width: 170px; z-index: 200;
+}
+.export-menu.open { display: block; }
+.export-menu a {
+  display: block; padding: 9px 16px; font-size: 13px; color: var(--text);
+  text-decoration: none;
+}
+.export-menu a:hover { background: var(--bg); }
+
 /* ── Misc ─────────────────────────────────────────────────── */
 .empty-state { color: var(--text-sub); font-size: 13px; padding: 16px 0; text-align: center; }
 small { font-size: 11px; color: var(--text-sub); }

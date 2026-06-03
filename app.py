@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, date
+import csv
+import io
 import logging
 
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, Response
 
 import config
 import notifications
@@ -533,6 +535,121 @@ def delete_subtask(subtask_id):
     db.session.delete(subtask)
     db.session.commit()
     return redirect(url_for("task_detail", task_id=task_id))
+
+
+# ── Exports ───────────────────────────────────────────────────────────────────
+
+@app.route("/export/deals")
+def export_deals():
+    deals = Deal.query.order_by(Deal.created_at.desc()).all()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "Deal ID", "Client Name", "Company", "Phone", "Email", "Source",
+        "Deal Title", "Value (₹)", "Stage", "Salesperson", "Notes",
+        "Created Date", "Last Updated",
+    ])
+    for d in deals:
+        writer.writerow([
+            d.id,
+            d.client.name,
+            d.client.company or "",
+            d.client.phone or "",
+            d.client.email or "",
+            d.client.source or "",
+            d.title,
+            d.value,
+            d.stage.replace("_", " ").title(),
+            d.salesperson or "",
+            (d.notes or "").replace("\n", " "),
+            d.created_at.strftime("%Y-%m-%d %H:%M"),
+            d.updated_at.strftime("%Y-%m-%d %H:%M"),
+        ])
+
+    filename = f"deals_{date.today().isoformat()}.csv"
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@app.route("/export/activities")
+def export_activities():
+    activities = Activity.query.order_by(Activity.scheduled_at.desc()).all()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "Activity ID", "Client Name", "Deal Title", "Type",
+        "Scheduled At", "Location", "Meeting Link", "Notes", "Outcome",
+        "Created At",
+    ])
+    for a in activities:
+        writer.writerow([
+            a.id,
+            a.deal.client.name,
+            a.deal.title,
+            a.type.replace("_", " ").title(),
+            a.scheduled_at.strftime("%Y-%m-%d %H:%M") if a.scheduled_at else "",
+            a.location or "",
+            a.meeting_link or "",
+            (a.notes or "").replace("\n", " "),
+            (a.outcome or "").replace("\n", " "),
+            a.created_at.strftime("%Y-%m-%d %H:%M"),
+        ])
+
+    filename = f"activities_{date.today().isoformat()}.csv"
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@app.route("/export/tasks")
+def export_tasks():
+    tasks = Task.query.order_by(Task.created_at.desc()).all()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "Task ID", "Title", "Description", "Status", "Priority",
+        "Assigned To", "Created By", "Due Date", "Labels",
+        "Linked Deal", "Linked Client",
+        "Subtasks Total", "Subtasks Done",
+        "Comments", "Is Recurring", "Recur Interval",
+        "Created At", "Updated At",
+    ])
+    for t in tasks:
+        writer.writerow([
+            t.id,
+            t.title,
+            (t.description or "").replace("\n", " "),
+            t.status.replace("_", " ").title(),
+            t.priority.title(),
+            t.assigned_to or "",
+            t.created_by or "",
+            t.due_date.isoformat() if t.due_date else "",
+            ", ".join(t.label_list),
+            t.deal.title if t.deal else "",
+            t.deal.client.name if t.deal else "",
+            len(t.subtasks),
+            t.subtasks_done,
+            len(t.comments),
+            "Yes" if t.is_recurring else "No",
+            t.recur_interval or "",
+            t.created_at.strftime("%Y-%m-%d %H:%M"),
+            t.updated_at.strftime("%Y-%m-%d %H:%M"),
+        ])
+
+    filename = f"tasks_{date.today().isoformat()}.csv"
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 if __name__ == "__main__":

@@ -10,6 +10,14 @@
   <h1>Task Board</h1>
   <div style="display:flex;gap:8px;align-items:center">
     <a href="{{ url_for('my_tasks') }}" class="btn btn-secondary">👤 My Tasks</a>
+    <div class="export-dropdown">
+      <button class="btn btn-secondary" onclick="this.nextElementSibling.classList.toggle('open')">
+        ⬇ Export
+      </button>
+      <div class="export-menu">
+        <a href="{{ url_for('export_tasks') }}">📋 Tasks CSV</a>
+      </div>
+    </div>
     <a href="{{ url_for('new_task') }}" class="btn btn-primary">+ New Task</a>
   </div>
 </div>
