@@ -1,0 +1,8 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+instance/
+tracker.db
+*.db
+.DS_Store

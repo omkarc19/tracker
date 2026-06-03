@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Sales Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Dashboard</h1>
+  <span class="subtitle">{{ self.today() if self.today is defined else "" }}</span>
+</div>
+
+<!-- Pipeline summary cards -->
+<section class="section">
+  <h2 class="section-title">Pipeline Overview</h2>
+  <div class="stage-cards">
+    {% set stage_emoji = {"new": "🔵", "contacted": "📞", "pitched": "🎯", "follow_up": "🔄", "negotiation": "🤝", "won": "🏆", "lost": "❌"} %}
+    {% for stage in stages %}
+      {% set info = pipeline_by_stage[stage] %}
+      <a href="{{ url_for('pipeline') }}?stage={{ stage }}" class="stage-card stage-{{ stage }}">
+        <div class="stage-emoji">{{ stage_emoji[stage] }}</div>
+        <div class="stage-name">{{ stage.replace("_", " ").title() }}</div>
+        <div class="stage-count">{{ info.count }} deal{{ "s" if info.count != 1 else "" }}</div>
+        <div class="stage-value">₹{{ "{:,.0f}".format(info.value) }}</div>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- Weekly revenue vs target -->
+<section class="section">
+  <div class="metrics-row">
+    <div class="metric-card">
+      <div class="metric-label">Won This Week</div>
+      <div class="metric-value">{{ won_this_week }} deal{{ "s" if won_this_week != 1 else "" }}</div>
+      <div class="metric-sub">₹{{ "{:,.0f}".format(won_value) }}</div>
+    </div>
+    {% if weekly_target %}
+    <div class="metric-card">
+      <div class="metric-label">Weekly Target</div>
+      <div class="metric-value">₹{{ "{:,.0f}".format(weekly_target.amount) }}</div>
+      <div class="progress-bar">
+        {% set pct = [[(won_value / weekly_target.amount * 100)|int, 0]|max, 100]|min %}
+        <div class="progress-fill {% if pct >= 100 %}fill-green{% elif pct >= 60 %}fill-yellow{% else %}fill-red{% endif %}" style="width: {{ pct }}%"></div>
+      </div>
+      <div class="metric-sub">{{ pct }}% of target</div>
+    </div>
+    {% else %}
+    <div class="metric-card metric-muted">
+      <div class="metric-label">Weekly Target</div>
+      <div class="metric-sub"><a href="{{ url_for('targets') }}">Set a target →</a></div>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Today's meetings -->
+<section class="section">
+  <h2 class="section-title">Today's Meetings
+    <span class="badge">{{ today_meetings|length }}</span>
+  </h2>
+  {% if today_meetings %}
+  <div class="card-list">
+    {% for activity in today_meetings %}
+    <div class="activity-card">
+      <div class="activity-time">{{ activity.scheduled_at.strftime("%I:%M %p") }}</div>
+      <div class="activity-body">
+        <div class="activity-client">
+          <a href="{{ url_for('deal_detail', deal_id=activity.deal_id) }}">{{ activity.deal.client.name }}</a>
+          {% if activity.deal.client.company %}<span class="company">{{ activity.deal.client.company }}</span>{% endif %}
+        </div>
+        <div class="activity-deal">{{ activity.deal.title }}</div>
+        {% if activity.location %}
+          <div class="activity-location">📍 {{ activity.location }}</div>
+        {% endif %}
+        {% if activity.meeting_link %}
+          <div class="activity-location">🔗 <a href="{{ activity.meeting_link }}" target="_blank">Join meeting</a></div>
+        {% endif %}
+        {% if activity.notes %}
+          <div class="activity-notes">{{ activity.notes }}</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+    <p class="empty-state">No meetings scheduled today.</p>
+  {% endif %}
+</section>
+
+<!-- Stale deals -->
+<section class="section">
+  <h2 class="section-title">Needs Follow-up
+    <span class="badge badge-warn">{{ stale_deals|length }}</span>
+  </h2>
+  {% if stale_deals %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Client</th>
+        <th>Deal</th>
+        <th>Stage</th>
+        <th>Days Idle</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for deal in stale_deals %}
+      <tr>
+        <td>
+          <a href="{{ url_for('deal_detail', deal_id=deal.id) }}">{{ deal.client.name }}</a>
+          {% if deal.client.company %}<br><small>{{ deal.client.company }}</small>{% endif %}
+        </td>
+        <td>{{ deal.title }}</td>
+        <td><span class="stage-tag stage-{{ deal.stage }}">{{ deal.stage.replace("_", " ").title() }}</span></td>
+        <td class="days-idle">{{ deal.days_in_stage }}d</td>
+        <td>₹{{ "{:,.0f}".format(deal.value) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="empty-state">All deals are active. 🎉</p>
+  {% endif %}
+</section>
+{% endblock %}

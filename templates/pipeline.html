@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}Pipeline — Sales Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Pipeline</h1>
+  <a href="{{ url_for('new_client') }}" class="btn btn-primary">+ New Deal</a>
+</div>
+
+{% set stage_emoji = {"new": "🔵", "contacted": "📞", "pitched": "🎯", "follow_up": "🔄", "negotiation": "🤝", "won": "🏆", "lost": "❌"} %}
+
+<div class="kanban-board">
+  {% for stage in stages %}
+  <div class="kanban-col" data-stage="{{ stage }}" id="col-{{ stage }}">
+    <div class="kanban-header stage-header-{{ stage }}">
+      <span>{{ stage_emoji[stage] }} {{ stage.replace("_", " ").title() }}</span>
+      <span class="kanban-count" id="count-{{ stage }}">{{ deals_by_stage[stage]|length }}</span>
+    </div>
+    <div class="kanban-cards drop-zone" data-stage="{{ stage }}">
+      {% for deal in deals_by_stage[stage] %}
+      <div class="deal-card"
+           draggable="true"
+           data-deal-id="{{ deal.id }}"
+           data-stage="{{ deal.stage }}"
+           onclick="window.location='{{ url_for('deal_detail', deal_id=deal.id) }}'">
+        <div class="deal-client">{{ deal.client.name }}</div>
+        {% if deal.client.company %}
+          <div class="deal-company">{{ deal.client.company }}</div>
+        {% endif %}
+        <div class="deal-title">{{ deal.title }}</div>
+        <div class="deal-footer">
+          <span class="deal-value">₹{{ "{:,.0f}".format(deal.value) }}</span>
+          <span class="deal-age {% if deal.days_in_stage > 7 %}age-warn{% endif %}">
+            {{ deal.days_in_stage }}d
+          </span>
+        </div>
+        {% if deal.salesperson %}
+          <div class="deal-person">👤 {{ deal.salesperson }}</div>
+        {% endif %}
+      </div>
+      {% else %}
+        <div class="kanban-empty" id="empty-{{ stage }}">No deals</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div id="drag-toast" class="drag-toast hidden"></div>
+
+<script>
+  let draggingEl = null;
+  let sourceStage = null;
+  let placeholder = null;
+
+  function createPlaceholder() {
+    const el = document.createElement("div");
+    el.className = "drop-placeholder";
+    return el;
+  }
+
+  document.querySelectorAll(".deal-card").forEach(card => {
+    card.addEventListener("dragstart", e => {
+      draggingEl = card;
+      sourceStage = card.dataset.stage;
+      card.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", card.dataset.dealId);
+      placeholder = createPlaceholder();
+      setTimeout(() => card.style.opacity = "0.4", 0);
+    });
+
+    card.addEventListener("dragend", () => {
+      card.classList.remove("dragging");
+      card.style.opacity = "";
+      if (placeholder && placeholder.parentNode) placeholder.remove();
+      placeholder = null;
+      draggingEl = null;
+      document.querySelectorAll(".drop-zone").forEach(z => z.classList.remove("drag-over"));
+    });
+  });
+
+  document.querySelectorAll(".drop-zone").forEach(zone => {
+    zone.addEventListener("dragover", e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      zone.classList.add("drag-over");
+
+      // Position placeholder before the card being hovered
+      const afterEl = getDragAfterElement(zone, e.clientY);
+      if (placeholder) {
+        if (afterEl == null) {
+          zone.appendChild(placeholder);
+        } else {
+          zone.insertBefore(placeholder, afterEl);
+        }
+      }
+    });
+
+    zone.addEventListener("dragleave", e => {
+      if (!zone.contains(e.relatedTarget)) {
+        zone.classList.remove("drag-over");
+      }
+    });
+
+    zone.addEventListener("drop", async e => {
+      e.preventDefault();
+      zone.classList.remove("drag-over");
+      if (!draggingEl) return;
+
+      const dealId = draggingEl.dataset.dealId;
+      const newStage = zone.dataset.stage;
+      const oldStage = sourceStage;
+
+      if (newStage === oldStage) {
+        draggingEl.style.opacity = "";
+        return;
+      }
+
+      // Optimistically move the card
+      if (placeholder && placeholder.parentNode) {
+        zone.insertBefore(draggingEl, placeholder);
+        placeholder.remove();
+      } else {
+        zone.appendChild(draggingEl);
+      }
+      draggingEl.dataset.stage = newStage;
+
+      // Update empty state labels
+      updateEmptyState(oldStage);
+      updateEmptyState(newStage);
+      updateCount(oldStage);
+      updateCount(newStage);
+
+      // Persist to server
+      try {
+        const res = await fetch(`/api/deal/${dealId}/stage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stage: newStage }),
+        });
+        if (!res.ok) throw new Error("Server error");
+        showToast(`Moved to ${newStage.replace(/_/g, " ")}`);
+      } catch {
+        // Rollback
+        const oldZone = document.querySelector(`.drop-zone[data-stage="${oldStage}"]`);
+        oldZone.appendChild(draggingEl);
+        draggingEl.dataset.stage = oldStage;
+        updateEmptyState(oldStage);
+        updateEmptyState(newStage);
+        updateCount(oldStage);
+        updateCount(newStage);
+        showToast("Failed to update — try again", true);
+      }
+    });
+  });
+
+  function getDragAfterElement(container, y) {
+    const draggables = [...container.querySelectorAll(".deal-card:not(.dragging)")];
+    return draggables.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset, element: child };
+      }
+      return closest;
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
+  function updateEmptyState(stage) {
+    const zone = document.querySelector(`.drop-zone[data-stage="${stage}"]`);
+    const emptyEl = document.getElementById(`empty-${stage}`);
+    const cards = zone.querySelectorAll(".deal-card");
+    if (cards.length === 0) {
+      if (!emptyEl) {
+        const div = document.createElement("div");
+        div.className = "kanban-empty";
+        div.id = `empty-${stage}`;
+        div.textContent = "No deals";
+        zone.appendChild(div);
+      }
+    } else if (emptyEl) {
+      emptyEl.remove();
+    }
+  }
+
+  function updateCount(stage) {
+    const zone = document.querySelector(`.drop-zone[data-stage="${stage}"]`);
+    const count = zone.querySelectorAll(".deal-card").length;
+    const el = document.getElementById(`count-${stage}`);
+    if (el) el.textContent = count;
+  }
+
+  function showToast(msg, isError = false) {
+    const toast = document.getElementById("drag-toast");
+    toast.textContent = msg;
+    toast.className = "drag-toast" + (isError ? " toast-error" : "");
+    setTimeout(() => toast.classList.add("hidden"), 2000);
+  }
+</script>
+{% endblock %}

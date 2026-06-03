@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}My Tasks — Sales Tracker{% endblock %}
+
+{% block content %}
+{% set priority_emoji = {"low": "🟢", "medium": "🟡", "high": "🟠", "urgent": "🔴"} %}
+{% set status_label = {"todo": "To Do", "in_progress": "In Progress", "done": "Done"} %}
+
+<div class="page-header">
+  <h1>My Tasks</h1>
+  <div style="display:flex;gap:8px">
+    <a href="{{ url_for('tasks_board') }}" class="btn btn-secondary">📋 Board View</a>
+    <a href="{{ url_for('new_task') }}" class="btn btn-primary">+ New Task</a>
+  </div>
+</div>
+
+<div class="filter-bar">
+  <form method="GET" action="{{ url_for('my_tasks') }}" class="filter-form">
+    <select name="person" class="input-select filter-select" onchange="this.form.submit()">
+      <option value="">Select person...</option>
+      {% for a in assignees %}
+        <option value="{{ a }}" {% if person == a %}selected{% endif %}>{{ a }}</option>
+      {% endfor %}
+    </select>
+    <select name="status" class="input-select filter-select" onchange="this.form.submit()">
+      <option value="">All Statuses</option>
+      {% for s in statuses %}
+        <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ status_label[s] }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+{% if tasks %}
+<div class="my-tasks-list">
+  {% set ns = namespace(current_date=None) %}
+  {% for task in tasks %}
+    {% set due_label = task.due_date.strftime("%d %b %Y") if task.due_date else "No due date" %}
+    {% if due_label != ns.current_date %}
+      {% set ns.current_date = due_label %}
+      <div class="task-date-header {% if task.is_overdue %}overdue-header{% endif %}">
+        {{ "🔴 Overdue" if task.is_overdue else due_label }}
+      </div>
+    {% endif %}
+    <div class="my-task-row {% if task.is_overdue %}task-overdue{% endif %}">
+      <div class="my-task-priority">
+        <span class="task-priority-dot priority-{{ task.priority }}" title="{{ task.priority }}"></span>
+      </div>
+      <div class="my-task-body">
+        <a href="{{ url_for('task_detail', task_id=task.id) }}" class="my-task-title">{{ task.title }}</a>
+        {% if task.label_list %}
+          <div class="task-labels" style="margin-top:3px">
+            {% for lbl in task.label_list %}
+              <span class="task-label">{{ lbl.replace("_"," ") }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% if task.deal %}
+          <div class="task-deal-link">🔗 {{ task.deal.title }} — {{ task.deal.client.name }}</div>
+        {% endif %}
+      </div>
+      <div class="my-task-meta">
+        <span class="task-status-tag status-{{ task.status }}">{{ status_label[task.status] }}</span>
+        {% if task.subtasks %}
+          <span class="task-subtask-count">☑ {{ task.subtasks_done }}/{{ task.subtasks|length }}</span>
+        {% endif %}
+        {% if task.is_recurring %}<span title="Recurring">🔁</span>{% endif %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% else %}
+  <div class="empty-state" style="margin-top:40px">
+    {% if person %}
+      No tasks for {{ person }}{% if status_filter %} with status "{{ status_label[status_filter] }}"{% endif %}. 🎉
+    {% else %}
+      Select a person above to see their tasks.
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

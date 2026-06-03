@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}{{ deal.client.name }} — {{ deal.title }}{% endblock %}
+
+{% block content %}
+{% set stage_emoji = {"new": "🔵", "contacted": "📞", "pitched": "🎯", "follow_up": "🔄", "negotiation": "🤝", "won": "🏆", "lost": "❌"} %}
+
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('pipeline') }}" class="back-link">← Pipeline</a>
+    <h1>{{ deal.client.name }}
+      {% if deal.client.company %}<span class="company-sub">{{ deal.client.company }}</span>{% endif %}
+    </h1>
+    <div class="deal-meta">
+      <span class="stage-tag stage-{{ deal.stage }}">{{ stage_emoji[deal.stage] }} {{ deal.stage.replace("_", " ").title() }}</span>
+      <span class="deal-value-lg">₹{{ "{:,.0f}".format(deal.value) }}</span>
+      {% if deal.salesperson %}<span class="deal-owner">👤 {{ deal.salesperson }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="header-actions">
+    <a href="{{ url_for('edit_deal', deal_id=deal.id) }}" class="btn btn-secondary">Edit</a>
+    <form method="POST" action="{{ url_for('delete_deal', deal_id=deal.id) }}" onsubmit="return confirm('Delete this deal?')">
+      <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
+  </div>
+</div>
+
+<div class="deal-layout">
+
+  <!-- Left: info + stage change -->
+  <div class="deal-sidebar">
+
+    <div class="card">
+      <h3>Contact Info</h3>
+      <dl class="info-list">
+        <dt>Name</dt><dd>{{ deal.client.name }}</dd>
+        {% if deal.client.company %}<dt>Company</dt><dd>{{ deal.client.company }}</dd>{% endif %}
+        {% if deal.client.phone %}<dt>Phone</dt><dd><a href="tel:{{ deal.client.phone }}">{{ deal.client.phone }}</a></dd>{% endif %}
+        {% if deal.client.email %}<dt>Email</dt><dd><a href="mailto:{{ deal.client.email }}">{{ deal.client.email }}</a></dd>{% endif %}
+        {% if deal.client.source %}<dt>Source</dt><dd>{{ deal.client.source }}</dd>{% endif %}
+      </dl>
+    </div>
+
+    <div class="card">
+      <h3>Deal Info</h3>
+      <dl class="info-list">
+        <dt>Title</dt><dd>{{ deal.title }}</dd>
+        <dt>Value</dt><dd>₹{{ "{:,.0f}".format(deal.value) }}</dd>
+        <dt>Days in stage</dt><dd>{{ deal.days_in_stage }}</dd>
+        <dt>Created</dt><dd>{{ deal.created_at.strftime("%d %b %Y") }}</dd>
+      </dl>
+      {% if deal.notes %}
+        <div class="notes-block">{{ deal.notes }}</div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h3>Move Stage</h3>
+      <form method="POST" action="{{ url_for('update_stage', deal_id=deal.id) }}">
+        <select name="stage" class="input-select">
+          {% for stage in stages %}
+            <option value="{{ stage }}" {% if stage == deal.stage %}selected{% endif %}>
+              {{ stage_emoji[stage] }} {{ stage.replace("_", " ").title() }}
+            </option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary" style="margin-top:8px;width:100%">Update Stage</button>
+      </form>
+    </div>
+
+  </div>
+
+  <!-- Right: activity timeline + add form -->
+  <div class="deal-main">
+
+    <div class="card">
+      <h3>Log Activity</h3>
+      <form method="POST" action="{{ url_for('add_activity', deal_id=deal.id) }}" class="activity-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Type</label>
+            <select name="type" class="input-select">
+              {% for t in activity_types %}
+                <option value="{{ t }}">{{ t.replace("_", " ").title() }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Date & Time</label>
+            <input type="datetime-local" name="scheduled_at" class="input-text" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Location</label>
+            <input type="text" name="location" class="input-text" placeholder="Office / Café / Address" />
+          </div>
+          <div class="form-group">
+            <label>Meeting Link</label>
+            <input type="url" name="meeting_link" class="input-text" placeholder="https://meet.google.com/..." />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea name="notes" class="input-textarea" rows="2" placeholder="Agenda or prep notes..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Outcome</label>
+          <textarea name="outcome" class="input-textarea" rows="2" placeholder="How did it go?"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Log Activity</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Activity Timeline
+        <span class="badge">{{ activities|length }}</span>
+      </h3>
+      {% if activities %}
+      <div class="timeline">
+        {% set type_emoji = {"meeting": "📅", "call": "📞", "email": "📧", "follow_up": "🔄", "demo": "🖥️", "other": "📌"} %}
+        {% for activity in activities %}
+        <div class="timeline-item">
+          <div class="timeline-icon">{{ type_emoji.get(activity.type, "📌") }}</div>
+          <div class="timeline-body">
+            <div class="timeline-header">
+              <span class="timeline-type">{{ activity.type.replace("_", " ").title() }}</span>
+              {% if activity.scheduled_at %}
+                <span class="timeline-time">{{ activity.scheduled_at.strftime("%d %b %Y, %I:%M %p") }}</span>
+              {% endif %}
+            </div>
+            {% if activity.location %}
+              <div class="timeline-detail">📍 {{ activity.location }}</div>
+            {% endif %}
+            {% if activity.meeting_link %}
+              <div class="timeline-detail">🔗 <a href="{{ activity.meeting_link }}" target="_blank">{{ activity.meeting_link }}</a></div>
+            {% endif %}
+            {% if activity.notes %}
+              <div class="timeline-notes"><strong>Notes:</strong> {{ activity.notes }}</div>
+            {% endif %}
+            {% if activity.outcome %}
+              <div class="timeline-outcome"><strong>Outcome:</strong> {{ activity.outcome }}</div>
+            {% endif %}
+            <form method="POST" action="{{ url_for('delete_activity', activity_id=activity.id) }}"
+                  style="margin-top:6px" onsubmit="return confirm('Remove this activity?')">
+              <button type="submit" class="btn-link-danger">remove</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+        <p class="empty-state">No activities yet. Log the first one above.</p>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+{% endblock %}

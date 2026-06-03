@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+{% block title %}{{ task.title }} — Tasks{% endblock %}
+
+{% block content %}
+{% set priority_emoji = {"low": "🟢", "medium": "🟡", "high": "🟠", "urgent": "🔴"} %}
+{% set status_label = {"todo": "To Do", "in_progress": "In Progress", "done": "Done"} %}
+
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('tasks_board') }}" class="back-link">← Task Board</a>
+    <h1>{{ task.title }}</h1>
+    <div class="deal-meta" style="margin-top:6px">
+      <span class="task-status-tag status-{{ task.status }}">{{ status_label[task.status] }}</span>
+      <span>{{ priority_emoji[task.priority] }} {{ task.priority.title() }} priority</span>
+      {% if task.is_overdue %}<span class="overdue-text">⚠️ Overdue</span>{% endif %}
+      {% if task.is_recurring %}<span>🔁 Recurring ({{ task.recur_interval }})</span>{% endif %}
+    </div>
+  </div>
+  <div class="header-actions">
+    <button onclick="document.getElementById('edit-panel').classList.toggle('hidden')" class="btn btn-secondary">Edit</button>
+    <form method="POST" action="{{ url_for('delete_task', task_id=task.id) }}" onsubmit="return confirm('Delete this task?')">
+      <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
+  </div>
+</div>
+
+<!-- Edit panel (hidden by default) -->
+<div id="edit-panel" class="hidden card" style="margin-bottom:20px">
+  <h3>Edit Task</h3>
+  <form method="POST" action="{{ url_for('edit_task', task_id=task.id) }}">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Title <span class="required">*</span></label>
+        <input type="text" name="title" class="input-text" required value="{{ task.title }}" />
+      </div>
+      <div class="form-group">
+        <label>Edited by</label>
+        <input type="text" name="edited_by" class="input-text" placeholder="Your name" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea name="description" class="input-textarea" rows="2">{{ task.description or '' }}</textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Priority</label>
+        <select name="priority" class="input-select">
+          {% for p in priorities %}
+            <option value="{{ p }}" {% if task.priority == p %}selected{% endif %}>{{ p.title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Due Date</label>
+        <input type="date" name="due_date" class="input-text"
+               value="{{ task.due_date.isoformat() if task.due_date else '' }}" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Assigned To</label>
+        <input type="text" name="assigned_to" class="input-text" value="{{ task.assigned_to or '' }}" />
+      </div>
+      <div class="form-group">
+        <label>Linked Deal</label>
+        <select name="deal_id" class="input-select">
+          <option value="">— None —</option>
+          {% for d in deals %}
+            <option value="{{ d.id }}" {% if task.deal_id == d.id %}selected{% endif %}>
+              {{ d.client.name }} — {{ d.title }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Labels</label>
+      <div class="label-checkboxes">
+        {% for lbl in labels %}
+          <label class="checkbox-label">
+            <input type="checkbox" name="labels" value="{{ lbl }}"
+                   {% if lbl in task.label_list %}checked{% endif %} />
+            {{ lbl.replace("_", " ").title() }}
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="checkbox-label" style="flex-direction:row;gap:8px;align-items:center">
+          <input type="checkbox" name="is_recurring" id="edit-recurring"
+                 {% if task.is_recurring %}checked{% endif %}
+                 onchange="document.getElementById('edit-recur-interval').style.display=this.checked?'block':'none'" />
+          Recurring task
+        </label>
+      </div>
+      <div class="form-group" id="edit-recur-interval" style="display:{% if task.is_recurring %}block{% else %}none{% endif %}">
+        <label>Repeat every</label>
+        <select name="recur_interval" class="input-select">
+          {% for ri in recur_intervals %}
+            <option value="{{ ri }}" {% if task.recur_interval == ri %}selected{% endif %}>{{ ri.title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="button" onclick="document.getElementById('edit-panel').classList.add('hidden')" class="btn btn-secondary">Cancel</button>
+      <button type="submit" class="btn btn-primary">Save Changes</button>
+    </div>
+  </form>
+</div>
+
+<div class="deal-layout">
+
+  <!-- Sidebar -->
+  <div class="deal-sidebar">
+
+    <div class="card">
+      <h3>Details</h3>
+      <dl class="info-list">
+        <dt>Status</dt>
+        <dd><span class="task-status-tag status-{{ task.status }}">{{ status_label[task.status] }}</span></dd>
+        <dt>Priority</dt>
+        <dd>{{ priority_emoji[task.priority] }} {{ task.priority.title() }}</dd>
+        {% if task.due_date %}
+          <dt>Due</dt>
+          <dd class="{% if task.is_overdue %}overdue-text{% endif %}">{{ task.due_date.strftime("%d %b %Y") }}</dd>
+        {% endif %}
+        {% if task.assigned_to %}
+          <dt>Assigned</dt><dd>{{ task.assigned_to }}</dd>
+        {% endif %}
+        {% if task.created_by %}
+          <dt>Created by</dt><dd>{{ task.created_by }}</dd>
+        {% endif %}
+        <dt>Created</dt><dd>{{ task.created_at.strftime("%d %b %Y") }}</dd>
+        {% if task.is_recurring %}
+          <dt>Recurring</dt><dd>Every {{ task.recur_interval }}</dd>
+        {% endif %}
+      </dl>
+      {% if task.label_list %}
+        <div style="margin-top:10px">
+          {% for lbl in task.label_list %}
+            <span class="task-label">{{ lbl.replace("_"," ") }}</span>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% if task.description %}
+        <div class="notes-block" style="margin-top:12px">{{ task.description }}</div>
+      {% endif %}
+    </div>
+
+    {% if task.deal %}
+    <div class="card">
+      <h3>Linked Deal</h3>
+      <a href="{{ url_for('deal_detail', deal_id=task.deal.id) }}" style="font-weight:600">
+        {{ task.deal.title }}
+      </a>
+      <div style="font-size:12px;color:var(--text-sub);margin-top:4px">
+        {{ task.deal.client.name }}
+        {% if task.deal.client.company %} · {{ task.deal.client.company }}{% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <h3>Move Status</h3>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        {% for s in statuses %}
+        <button onclick="moveTaskStatus('{{ task.id }}', '{{ s }}')"
+                class="btn {% if task.status == s %}btn-primary{% else %}btn-secondary{% endif %}">
+          {{ status_label[s] }}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Subtasks -->
+    <div class="card">
+      <h3>Checklist
+        {% if task.subtasks %}
+          <span class="badge">{{ task.subtasks_done }}/{{ task.subtasks|length }}</span>
+        {% endif %}
+      </h3>
+      {% if task.subtasks %}
+        {% set total = task.subtasks|length %}
+        {% set done = task.subtasks_done %}
+        <div class="progress-bar" style="margin-bottom:12px">
+          <div class="progress-fill fill-green" style="width:{{ (done/total*100)|int }}%"></div>
+        </div>
+        {% for sub in task.subtasks %}
+        <div class="subtask-row">
+          <form method="POST" action="{{ url_for('toggle_subtask', subtask_id=sub.id) }}" style="display:inline">
+            <button type="submit" class="subtask-check {% if sub.done %}subtask-done{% endif %}">
+              {% if sub.done %}☑{% else %}☐{% endif %}
+            </button>
+          </form>
+          <span class="subtask-title {% if sub.done %}done-text{% endif %}">{{ sub.title }}</span>
+          <form method="POST" action="{{ url_for('delete_subtask', subtask_id=sub.id) }}" style="margin-left:auto">
+            <button type="submit" class="btn-link-danger">✕</button>
+          </form>
+        </div>
+        {% endfor %}
+      {% endif %}
+      <form method="POST" action="{{ url_for('add_subtask', task_id=task.id) }}" class="subtask-form">
+        <input type="text" name="title" class="input-text" placeholder="Add checklist item..." required />
+        <button type="submit" class="btn btn-secondary">Add</button>
+      </form>
+    </div>
+
+  </div>
+
+  <!-- Main: comments + activity log -->
+  <div class="deal-main">
+
+    <!-- Comments -->
+    <div class="card">
+      <h3>Comments <span class="badge">{{ task.comments|length }}</span></h3>
+      {% if task.comments %}
+      <div class="comment-list">
+        {% for comment in task.comments %}
+        <div class="comment-item">
+          <div class="comment-header">
+            <span class="comment-author">{{ comment.author }}</span>
+            <span class="comment-time">{{ comment.created_at.strftime("%d %b %Y, %I:%M %p") }}</span>
+            <form method="POST" action="{{ url_for('delete_task_comment', comment_id=comment.id) }}"
+                  style="margin-left:auto" onsubmit="return confirm('Remove comment?')">
+              <button type="submit" class="btn-link-danger">remove</button>
+            </form>
+          </div>
+          <div class="comment-body">{{ comment.body }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <form method="POST" action="{{ url_for('add_task_comment', task_id=task.id) }}" class="comment-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Your name</label>
+            <input type="text" name="author" class="input-text" placeholder="Name" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Comment</label>
+          <textarea name="body" class="input-textarea" rows="2" placeholder="Add a comment..." required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Post Comment</button>
+      </form>
+    </div>
+
+    <!-- Activity log -->
+    <div class="card">
+      <h3>Activity Log</h3>
+      {% if task.activity_log %}
+      <div class="timeline">
+        {% for entry in task.activity_log %}
+        <div class="timeline-item">
+          <div class="timeline-icon">📝</div>
+          <div class="timeline-body">
+            <div class="timeline-header">
+              <span class="timeline-type">{{ entry.action }}</span>
+              <span class="timeline-time">{{ entry.created_at.strftime("%d %b %Y, %I:%M %p") }}</span>
+            </div>
+            {% if entry.actor %}
+              <div class="timeline-detail">by {{ entry.actor }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+        <p class="empty-state">No activity yet.</p>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<script>
+async function moveTaskStatus(taskId, newStatus) {
+  try {
+    const res = await fetch(`/api/tasks/${taskId}/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus, actor: "team" }),
+    });
+    if (res.ok) window.location.reload();
+  } catch {}
+}
+</script>
+{% endblock %}
