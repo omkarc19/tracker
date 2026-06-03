@@ -44,6 +44,10 @@
           <option value="other">Other</option>
         </select>
       </div>
+      <div class="form-group">
+        <label>Client Notes</label>
+        <textarea name="client_notes" class="input-textarea" rows="2" placeholder="Background, preferences, relationship notes..."></textarea>
+      </div>
     </div>
 
     <div class="card">
@@ -64,7 +68,18 @@
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <textarea name="notes" class="input-textarea" rows="3" placeholder="Context, requirements, background..."></textarea>
+        <textarea name="notes" class="input-textarea" rows="2" placeholder="Context, requirements, background..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Labels</label>
+        <div class="label-checkboxes">
+          {% for lbl in deal_labels %}
+            <label class="checkbox-label">
+              <input type="checkbox" name="deal_labels" value="{{ lbl }}" />
+              {{ lbl.title() }}
+            </label>
+          {% endfor %}
+        </div>
       </div>
     </div>
 

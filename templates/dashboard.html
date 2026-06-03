@@ -120,4 +120,65 @@
     <p class="empty-state">All deals are active. 🎉</p>
   {% endif %}
 </section>
+
+{% set priority_emoji = {"low": "🟢", "medium": "🟡", "high": "🟠", "urgent": "🔴"} %}
+{% set status_label = {"todo": "To Do", "in_progress": "In Progress", "done": "Done"} %}
+
+<!-- Tasks due today -->
+<section class="section">
+  <h2 class="section-title">Tasks Due Today
+    <span class="badge {% if overdue_tasks %}badge-warn{% endif %}">{{ tasks_today|length }}</span>
+    <a href="{{ url_for('tasks_board') }}" style="font-size:12px;font-weight:400;margin-left:auto">View all →</a>
+  </h2>
+  {% if overdue_tasks %}
+  <div class="dash-task-group">
+    <div class="task-date-header overdue-header">🔴 Overdue ({{ overdue_tasks|length }})</div>
+    {% for task in overdue_tasks %}
+    <div class="dash-task-row">
+      <span class="task-priority-dot priority-{{ task.priority }}"></span>
+      <a href="{{ url_for('task_detail', task_id=task.id) }}" class="dash-task-title">{{ task.title }}</a>
+      <span class="dash-task-meta">{{ task.due_date.strftime("%d %b") }}</span>
+      {% if task.assigned_to %}<span class="dash-task-meta">👤 {{ task.assigned_to }}</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if tasks_today %}
+  <div class="dash-task-group">
+    {% if overdue_tasks %}<div class="task-date-header">Today</div>{% endif %}
+    {% for task in tasks_today %}
+    <div class="dash-task-row">
+      <span class="task-priority-dot priority-{{ task.priority }}"></span>
+      <a href="{{ url_for('task_detail', task_id=task.id) }}" class="dash-task-title">{{ task.title }}</a>
+      <span class="task-status-tag status-{{ task.status }}">{{ status_label[task.status] }}</span>
+      {% if task.assigned_to %}<span class="dash-task-meta">👤 {{ task.assigned_to }}</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if not tasks_today and not overdue_tasks %}
+    <p class="empty-state">No tasks due today. 🎉</p>
+  {% endif %}
+</section>
+
+<!-- Tasks due tomorrow -->
+<section class="section">
+  <h2 class="section-title">Tasks Due Tomorrow
+    <span class="badge">{{ tasks_tomorrow|length }}</span>
+  </h2>
+  {% if tasks_tomorrow %}
+  <div class="dash-task-group">
+    {% for task in tasks_tomorrow %}
+    <div class="dash-task-row">
+      <span class="task-priority-dot priority-{{ task.priority }}"></span>
+      <a href="{{ url_for('task_detail', task_id=task.id) }}" class="dash-task-title">{{ task.title }}</a>
+      <span class="task-status-tag status-{{ task.status }}">{{ status_label[task.status] }}</span>
+      {% if task.assigned_to %}<span class="dash-task-meta">👤 {{ task.assigned_to }}</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+    <p class="empty-state">Nothing due tomorrow.</p>
+  {% endif %}
+</section>
 {% endblock %}

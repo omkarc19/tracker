@@ -32,6 +32,10 @@
           <input type="email" name="client_email" class="input-text" value="{{ deal.client.email or '' }}" />
         </div>
       </div>
+      <div class="form-group">
+        <label>Client Notes</label>
+        <textarea name="client_notes" class="input-textarea" rows="2">{{ deal.client.notes or '' }}</textarea>
+      </div>
     </div>
 
     <div class="card">
@@ -52,7 +56,19 @@
       </div>
       <div class="form-group">
         <label>Notes</label>
-        <textarea name="notes" class="input-textarea" rows="3">{{ deal.notes or '' }}</textarea>
+        <textarea name="notes" class="input-textarea" rows="2">{{ deal.notes or '' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Labels</label>
+        <div class="label-checkboxes">
+          {% for lbl in deal_labels %}
+            <label class="checkbox-label">
+              <input type="checkbox" name="deal_labels" value="{{ lbl }}"
+                     {% if lbl in deal.label_list %}checked{% endif %} />
+              {{ lbl.title() }}
+            </label>
+          {% endfor %}
+        </div>
       </div>
     </div>
 

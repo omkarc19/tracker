@@ -10,7 +10,8 @@ import notifications
 import scheduler
 from models import (db, Client, Deal, Activity, Target, STAGES, ACTIVITY_TYPES,
                     Task, TaskComment, TaskSubtask, TaskActivity,
-                    TASK_STATUSES, TASK_PRIORITIES, TASK_LABELS, RECUR_INTERVALS)
+                    TASK_STATUSES, TASK_PRIORITIES, TASK_LABELS, RECUR_INTERVALS,
+                    DEAL_LABELS)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -23,21 +24,64 @@ db.init_app(app)
 
 with app.app_context():
     db.create_all()
+    # Add new columns to existing tables without dropping data
+    with db.engine.connect() as conn:
+        for sql in [
+            "ALTER TABLE clients ADD COLUMN notes TEXT",
+            "ALTER TABLE deals ADD COLUMN labels VARCHAR(300) DEFAULT ''",
+        ]:
+            try:
+                conn.execute(db.text(sql))
+                conn.commit()
+            except Exception:
+                pass  # column already exists
 
 scheduler.start(app)
+
+
+# ── Search ───────────────────────────────────────────────────────────────────
+
+@app.route("/search")
+def search():
+    q = request.args.get("q", "").strip()
+    deals, tasks = [], []
+    if q:
+        like = f"%{q}%"
+        deals = (Deal.query
+                 .join(Client)
+                 .filter(db.or_(
+                     Client.name.ilike(like),
+                     Client.company.ilike(like),
+                     Deal.title.ilike(like),
+                     Deal.salesperson.ilike(like),
+                 ))
+                 .order_by(Deal.updated_at.desc())
+                 .all())
+        tasks = (Task.query
+                 .filter(db.or_(
+                     Task.title.ilike(like),
+                     Task.description.ilike(like),
+                     Task.assigned_to.ilike(like),
+                 ))
+                 .order_by(Task.updated_at.desc())
+                 .all())
+    return render_template("search.html", q=q, deals=deals, tasks=tasks)
 
 
 # ── Dashboard ────────────────────────────────────────────────────────────────
 
 @app.route("/")
 def dashboard():
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    tomorrow = today_start + timedelta(days=1)
+    tomorrow_start = today_start + timedelta(days=1)
+    day_after_start = today_start + timedelta(days=2)
 
     today_meetings = Activity.query.filter(
         Activity.type == "meeting",
         Activity.scheduled_at >= today_start,
-        Activity.scheduled_at < tomorrow,
+        Activity.scheduled_at < tomorrow_start,
     ).order_by(Activity.scheduled_at).all()
 
     stale_cutoff = datetime.utcnow() - timedelta(days=5)
@@ -63,6 +107,21 @@ def dashboard():
 
     weekly_target = Target.query.filter_by(period_type="weekly").order_by(Target.id.desc()).first()
 
+    tasks_today = Task.query.filter(
+        Task.due_date == today,
+        Task.status != "done",
+    ).order_by(Task.priority.desc()).all()
+
+    tasks_tomorrow = Task.query.filter(
+        Task.due_date == tomorrow,
+        Task.status != "done",
+    ).order_by(Task.priority.desc()).all()
+
+    overdue_tasks = Task.query.filter(
+        Task.due_date < today,
+        Task.status != "done",
+    ).order_by(Task.due_date.asc()).limit(5).all()
+
     return render_template(
         "dashboard.html",
         today_meetings=today_meetings,
@@ -72,6 +131,9 @@ def dashboard():
         won_this_week=len(won_this_week),
         won_value=won_value,
         weekly_target=weekly_target,
+        tasks_today=tasks_today,
+        tasks_tomorrow=tasks_tomorrow,
+        overdue_tasks=overdue_tasks,
     )
 
 
@@ -79,14 +141,42 @@ def dashboard():
 
 @app.route("/pipeline")
 def pipeline():
-    stage_filter = request.args.get("stage")
-    query = Deal.query
-    if stage_filter and stage_filter in STAGES:
-        query = query.filter_by(stage=stage_filter)
+    label_filter = request.args.get("label", "")
+    salesperson_filter = request.args.get("salesperson", "")
+
     deals_by_stage = {}
+    stage_values = {}
     for stage in STAGES:
-        deals_by_stage[stage] = Deal.query.filter_by(stage=stage).order_by(Deal.updated_at.desc()).all()
-    return render_template("pipeline.html", deals_by_stage=deals_by_stage, stages=STAGES)
+        q = Deal.query.filter_by(stage=stage)
+        if label_filter:
+            q = q.filter(Deal.labels.contains(label_filter))
+        if salesperson_filter:
+            q = q.filter_by(salesperson=salesperson_filter)
+        deals = q.order_by(Deal.updated_at.desc()).all()
+        deals_by_stage[stage] = deals
+        stage_values[stage] = sum(d.value for d in deals)
+
+    total_pipeline_value = sum(
+        stage_values[s] for s in STAGES if s not in ("won", "lost")
+    )
+
+    salespersons = sorted(set(
+        d[0] for d in db.session.query(Deal.salesperson)
+        .filter(Deal.salesperson != None).distinct().all()
+        if d[0]
+    ))
+
+    return render_template(
+        "pipeline.html",
+        deals_by_stage=deals_by_stage,
+        stages=STAGES,
+        stage_values=stage_values,
+        total_pipeline_value=total_pipeline_value,
+        deal_labels=DEAL_LABELS,
+        label_filter=label_filter,
+        salespersons=salespersons,
+        salesperson_filter=salesperson_filter,
+    )
 
 
 # ── Clients ───────────────────────────────────────────────────────────────────
@@ -100,10 +190,12 @@ def new_client():
             phone=request.form.get("phone", "").strip() or None,
             email=request.form.get("email", "").strip() or None,
             source=request.form.get("source", "").strip() or None,
+            notes=request.form.get("client_notes", "").strip() or None,
         )
         db.session.add(client)
         db.session.flush()
 
+        label_vals = request.form.getlist("deal_labels")
         deal = Deal(
             client_id=client.id,
             title=request.form["deal_title"].strip(),
@@ -111,6 +203,7 @@ def new_client():
             stage="new",
             salesperson=request.form.get("salesperson", "").strip() or None,
             notes=request.form.get("notes", "").strip() or None,
+            labels=",".join(label_vals),
         )
         db.session.add(deal)
         db.session.commit()
@@ -119,7 +212,7 @@ def new_client():
         flash("Deal added successfully.", "success")
         return redirect(url_for("deal_detail", deal_id=deal.id))
 
-    return render_template("new_client.html")
+    return render_template("new_client.html", deal_labels=DEAL_LABELS)
 
 
 # ── Deal detail ───────────────────────────────────────────────────────────────
@@ -154,6 +247,29 @@ def update_stage(deal_id):
     return redirect(url_for("deal_detail", deal_id=deal_id))
 
 
+@app.route("/api/deal/<int:deal_id>/quick-log", methods=["POST"])
+def api_quick_log(deal_id):
+    Deal.query.get_or_404(deal_id)
+    data = request.get_json()
+    scheduled_raw = data.get("scheduled_at", "").strip()
+    scheduled_at = None
+    if scheduled_raw:
+        try:
+            scheduled_at = datetime.strptime(scheduled_raw, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            pass
+    activity = Activity(
+        deal_id=deal_id,
+        type=data.get("type", "call"),
+        scheduled_at=scheduled_at or datetime.utcnow(),
+        notes=data.get("notes", "").strip() or None,
+        outcome=data.get("outcome", "").strip() or None,
+    )
+    db.session.add(activity)
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
 @app.route("/api/deal/<int:deal_id>/stage", methods=["POST"])
 def api_update_stage(deal_id):
     deal = Deal.query.get_or_404(deal_id)
@@ -181,15 +297,17 @@ def edit_deal(deal_id):
         deal.value = float(request.form.get("value") or 0)
         deal.salesperson = request.form.get("salesperson", "").strip() or None
         deal.notes = request.form.get("notes", "").strip() or None
+        deal.labels = ",".join(request.form.getlist("deal_labels"))
         deal.client.name = request.form["client_name"].strip()
         deal.client.company = request.form.get("client_company", "").strip() or None
         deal.client.phone = request.form.get("client_phone", "").strip() or None
         deal.client.email = request.form.get("client_email", "").strip() or None
+        deal.client.notes = request.form.get("client_notes", "").strip() or None
         deal.updated_at = datetime.utcnow()
         db.session.commit()
         flash("Deal updated.", "success")
         return redirect(url_for("deal_detail", deal_id=deal_id))
-    return render_template("edit_deal.html", deal=deal)
+    return render_template("edit_deal.html", deal=deal, deal_labels=DEAL_LABELS)
 
 
 @app.route("/deal/<int:deal_id>/delete", methods=["POST"])

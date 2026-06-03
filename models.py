@@ -11,7 +11,8 @@ class Client(db.Model):
     company = db.Column(db.String(120))
     phone = db.Column(db.String(30))
     email = db.Column(db.String(120))
-    source = db.Column(db.String(60))  # referral / cold / inbound / etc.
+    source = db.Column(db.String(60))
+    notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     deals = db.relationship("Deal", backref="client", lazy=True, cascade="all, delete-orphan")
@@ -28,6 +29,7 @@ class Client(db.Model):
 
 
 STAGES = ["new", "contacted", "pitched", "follow_up", "negotiation", "won", "lost"]
+DEAL_LABELS = ["enterprise", "renewal", "upsell", "partnership", "startup", "government", "priority"]
 
 
 class Deal(db.Model):
@@ -39,6 +41,7 @@ class Deal(db.Model):
     stage = db.Column(db.String(30), default="new")
     salesperson = db.Column(db.String(120))
     notes = db.Column(db.Text)
+    labels = db.Column(db.String(300), default="")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -46,6 +49,10 @@ class Deal(db.Model):
         "Activity", backref="deal", lazy=True, cascade="all, delete-orphan",
         order_by="Activity.scheduled_at.desc()"
     )
+
+    @property
+    def label_list(self):
+        return [l.strip() for l in (self.labels or "").split(",") if l.strip()]
 
     @property
     def days_in_stage(self):

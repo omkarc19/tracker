@@ -9,11 +9,16 @@
 <body>
   <nav class="navbar">
     <a href="{{ url_for('dashboard') }}" class="nav-brand">📊 Sales Tracker</a>
+    <form class="nav-search" method="GET" action="{{ url_for('search') }}">
+      <input type="text" name="q" class="nav-search-input" placeholder="Search deals & tasks..."
+             value="{{ request.args.get('q', '') }}" />
+    </form>
     <div class="nav-links">
       <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
       <a href="{{ url_for('pipeline') }}" class="{% if request.endpoint in ['pipeline', 'deal_detail'] %}active{% endif %}">Pipeline</a>
       <a href="{{ url_for('targets') }}" class="{% if request.endpoint == 'targets' %}active{% endif %}">Targets</a>
       <a href="{{ url_for('tasks_board') }}" class="{% if request.endpoint in ['tasks_board','task_detail','my_tasks','new_task'] %}active{% endif %}">Tasks</a>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">🌙</button>
       <a href="{{ url_for('new_client') }}" class="btn-nav">+ New Deal</a>
     </div>
   </nav>
@@ -37,6 +42,25 @@
         document.querySelectorAll(".export-menu.open").forEach(m => m.classList.remove("open"));
       }
     });
+
+    // Dark mode
+    function toggleTheme() {
+      const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+      const next = isDark ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      localStorage.setItem("theme", next);
+      document.querySelector(".theme-toggle").textContent = next === "dark" ? "☀️" : "🌙";
+    }
+    (function() {
+      const saved = localStorage.getItem("theme") || "light";
+      document.documentElement.setAttribute("data-theme", saved);
+      if (saved === "dark") {
+        document.addEventListener("DOMContentLoaded", () => {
+          const btn = document.querySelector(".theme-toggle");
+          if (btn) btn.textContent = "☀️";
+        });
+      }
+    })();
   </script>
 </body>
 </html>

@@ -16,18 +16,54 @@
   --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
 }
 
+/* ── Dark mode ────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --border: #334155;
+  --text: #f1f5f9;
+  --text-sub: #94a3b8;
+  --shadow: 0 1px 3px rgba(0,0,0,.3);
+}
+[data-theme="dark"] .stage-new         { background: #1e3a5f; color: #93c5fd; }
+[data-theme="dark"] .stage-contacted   { background: #0c3a4a; color: #7dd3fc; }
+[data-theme="dark"] .stage-pitched     { background: #3d2a00; color: #fde68a; }
+[data-theme="dark"] .stage-follow_up   { background: #2e1b69; color: #c4b5fd; }
+[data-theme="dark"] .stage-negotiation { background: #3d1a00; color: #fed7aa; }
+[data-theme="dark"] .stage-won         { background: #064e3b; color: #6ee7b7; }
+[data-theme="dark"] .stage-lost        { background: #450a0a; color: #fca5a5; }
+[data-theme="dark"] .status-todo        { background: #1e293b; color: #94a3b8; }
+[data-theme="dark"] .status-in_progress { background: #3d2a00; color: #fde68a; }
+[data-theme="dark"] .status-done        { background: #064e3b; color: #6ee7b7; }
+[data-theme="dark"] .activity-card,
+[data-theme="dark"] .deal-card,
+[data-theme="dark"] .task-card { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .kanban-col { background: #1a2744; }
+[data-theme="dark"] .drop-zone.drag-over { background: #1e3a5f; }
+[data-theme="dark"] .notes-block { background: #0f172a; }
+[data-theme="dark"] .comment-item { background: #0f172a; }
+[data-theme="dark"] .my-task-row.task-overdue { background: #2d0a0a; }
+[data-theme="dark"] .data-table tr:hover td { background: #1a2744; }
+
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
 a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 /* ── Navbar ───────────────────────────────────────────────── */
-.navbar { display: flex; align-items: center; justify-content: space-between; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; height: 52px; position: sticky; top: 0; z-index: 100; }
-.nav-brand { font-weight: 700; font-size: 15px; color: var(--text); }
-.nav-links { display: flex; align-items: center; gap: 8px; }
-.nav-links a { padding: 6px 12px; border-radius: 6px; color: var(--text-sub); font-weight: 500; }
+.navbar { display: flex; align-items: center; gap: 12px; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 20px; height: 52px; position: sticky; top: 0; z-index: 100; }
+.nav-brand { font-weight: 700; font-size: 15px; color: var(--text); white-space: nowrap; }
+.nav-search { flex: 1; max-width: 320px; }
+.nav-search-input { width: 100%; padding: 6px 12px; border: 1px solid var(--border); border-radius: 20px; font-size: 13px; background: var(--bg); color: var(--text); outline: none; }
+.nav-search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px #eff6ff; }
+[data-theme="dark"] .nav-search-input:focus { box-shadow: 0 0 0 3px #1e3a5f; }
+.nav-links { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.nav-links a { padding: 6px 10px; border-radius: 6px; color: var(--text-sub); font-weight: 500; font-size: 13px; }
 .nav-links a:hover, .nav-links a.active { color: var(--primary); background: #eff6ff; text-decoration: none; }
+[data-theme="dark"] .nav-links a:hover,
+[data-theme="dark"] .nav-links a.active { background: #1e3a5f; }
 .btn-nav { background: var(--primary); color: #fff !important; border-radius: 6px; padding: 6px 14px; font-weight: 600; }
 .btn-nav:hover { background: var(--primary-dark); }
+.theme-toggle { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 14px; color: var(--text); }
 
 /* ── Main ─────────────────────────────────────────────────── */
 .main-content { max-width: 1280px; margin: 0 auto; padding: 24px 20px; }
@@ -329,6 +365,54 @@ label { font-size: 12px; font-weight: 600; color: var(--text-sub); }
   text-decoration: none;
 }
 .export-menu a:hover { background: var(--bg); }
+
+/* ── Deal labels ──────────────────────────────────────────── */
+.deal-label-tag { display: inline-block; background: #dbeafe; color: #1e40af; font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 10px; margin-right: 3px; }
+[data-theme="dark"] .deal-label-tag { background: #1e3a5f; color: #93c5fd; }
+.deal-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+.quick-log-btn { background: none; border: 1px solid var(--border); border-radius: 4px; color: var(--primary); font-size: 16px; font-weight: 700; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; line-height: 1; padding: 0; }
+.quick-log-btn:hover { background: #eff6ff; }
+.kanban-value { font-size: 10px; color: var(--text-sub); white-space: nowrap; }
+.pipeline-total { font-size: 13px; color: var(--text-sub); margin-left: auto; }
+
+/* ── Quick-log modal ──────────────────────────────────────── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal-box { background: var(--surface); border-radius: var(--radius); padding: 24px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+.modal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.modal-header h3 { font-size: 16px; font-weight: 700; }
+.modal-close { margin-left: auto; background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-sub); }
+.modal-close:hover { color: var(--text); }
+
+/* ── Dashboard task rows ──────────────────────────────────── */
+.dash-task-group { margin-bottom: 8px; }
+.dash-task-row { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.dash-task-row:last-child { border-bottom: none; }
+.dash-task-title { font-size: 13px; font-weight: 600; flex: 1; min-width: 120px; }
+.dash-task-meta { font-size: 11px; color: var(--text-sub); white-space: nowrap; }
+
+/* ── Search page ──────────────────────────────────────────── */
+.search-page-form { display: flex; gap: 10px; margin-bottom: 28px; }
+.search-page-input { flex: 1; font-size: 15px; padding: 10px 14px; }
+
+/* ── Mobile responsive kanban ─────────────────────────────── */
+@media (max-width: 900px) {
+  .kanban-board { flex-direction: column; overflow-x: unset; }
+  .kanban-col { flex: unset; min-width: unset; width: 100%; }
+  .task-board .kanban-col { flex: unset; min-width: unset; width: 100%; }
+  .navbar { flex-wrap: wrap; height: auto; padding: 8px 16px; gap: 8px; }
+  .nav-search { max-width: 100%; order: 3; width: 100%; }
+  .nav-links { gap: 2px; }
+  .nav-links a { padding: 5px 7px; font-size: 12px; }
+  .deal-layout, .targets-layout { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .main-content { padding: 16px 12px; }
+  .page-header { flex-direction: column; gap: 10px; }
+  .metrics-row { flex-direction: column; }
+  .stage-cards { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+}
 
 /* ── Misc ─────────────────────────────────────────────────── */
 .empty-state { color: var(--text-sub); font-size: 13px; padding: 16px 0; text-align: center; }

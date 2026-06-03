@@ -38,6 +38,12 @@
         {% if deal.client.email %}<dt>Email</dt><dd><a href="mailto:{{ deal.client.email }}">{{ deal.client.email }}</a></dd>{% endif %}
         {% if deal.client.source %}<dt>Source</dt><dd>{{ deal.client.source }}</dd>{% endif %}
       </dl>
+      {% if deal.client.notes %}
+        <div class="notes-block" style="margin-top:10px">
+          <strong style="font-size:11px;color:var(--text-sub);text-transform:uppercase;letter-spacing:.05em">Client Notes</strong>
+          <div style="margin-top:4px">{{ deal.client.notes }}</div>
+        </div>
+      {% endif %}
     </div>
 
     <div class="card">
@@ -48,8 +54,15 @@
         <dt>Days in stage</dt><dd>{{ deal.days_in_stage }}</dd>
         <dt>Created</dt><dd>{{ deal.created_at.strftime("%d %b %Y") }}</dd>
       </dl>
+      {% if deal.label_list %}
+        <div style="margin-top:8px">
+          {% for lbl in deal.label_list %}
+            <span class="deal-label-tag">{{ lbl }}</span>
+          {% endfor %}
+        </div>
+      {% endif %}
       {% if deal.notes %}
-        <div class="notes-block">{{ deal.notes }}</div>
+        <div class="notes-block" style="margin-top:8px">{{ deal.notes }}</div>
       {% endif %}
     </div>
 

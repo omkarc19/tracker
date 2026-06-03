@@ -4,11 +4,9 @@
 {% block content %}
 <div class="page-header">
   <h1>Pipeline</h1>
-  <div style="display:flex;gap:8px;align-items:center">
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
     <div class="export-dropdown">
-      <button class="btn btn-secondary" onclick="this.nextElementSibling.classList.toggle('open')">
-        ⬇ Export
-      </button>
+      <button class="btn btn-secondary" onclick="this.nextElementSibling.classList.toggle('open')">⬇ Export</button>
       <div class="export-menu">
         <a href="{{ url_for('export_deals') }}">📋 Deals CSV</a>
         <a href="{{ url_for('export_activities') }}">📅 Activities CSV</a>
@@ -18,6 +16,29 @@
   </div>
 </div>
 
+<!-- Label filter -->
+<div class="filter-bar">
+  <form method="GET" action="{{ url_for('pipeline') }}" class="filter-form">
+    <select name="label" class="input-select filter-select" onchange="this.form.submit()">
+      <option value="">All Labels</option>
+      {% for lbl in deal_labels %}
+        <option value="{{ lbl }}" {% if label_filter == lbl %}selected{% endif %}>{{ lbl.title() }}</option>
+      {% endfor %}
+    </select>
+    <select name="salesperson" class="input-select filter-select" onchange="this.form.submit()">
+      <option value="">All Salespersons</option>
+      {% for sp in salespersons %}
+        <option value="{{ sp }}" {% if salesperson_filter == sp %}selected{% endif %}>{{ sp }}</option>
+      {% endfor %}
+    </select>
+    {% if label_filter or salesperson_filter %}
+      <a href="{{ url_for('pipeline') }}" class="btn btn-secondary">Clear</a>
+    {% endif %}
+    <!-- Pipeline total value -->
+    <span class="pipeline-total">Total pipeline: <strong>₹{{ "{:,.0f}".format(total_pipeline_value) }}</strong></span>
+  </form>
+</div>
+
 {% set stage_emoji = {"new": "🔵", "contacted": "📞", "pitched": "🎯", "follow_up": "🔄", "negotiation": "🤝", "won": "🏆", "lost": "❌"} %}
 
 <div class="kanban-board">
@@ -25,7 +46,10 @@
   <div class="kanban-col" data-stage="{{ stage }}" id="col-{{ stage }}">
     <div class="kanban-header stage-header-{{ stage }}">
       <span>{{ stage_emoji[stage] }} {{ stage.replace("_", " ").title() }}</span>
-      <span class="kanban-count" id="count-{{ stage }}">{{ deals_by_stage[stage]|length }}</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span class="kanban-count" id="count-{{ stage }}">{{ deals_by_stage[stage]|length }}</span>
+        <span class="kanban-value" id="value-{{ stage }}">₹{{ "{:,.0f}".format(stage_values[stage]) }}</span>
+      </div>
     </div>
     <div class="kanban-cards drop-zone" data-stage="{{ stage }}">
       {% for deal in deals_by_stage[stage] %}
@@ -34,16 +58,25 @@
            data-deal-id="{{ deal.id }}"
            data-stage="{{ deal.stage }}"
            onclick="window.location='{{ url_for('deal_detail', deal_id=deal.id) }}'">
-        <div class="deal-client">{{ deal.client.name }}</div>
+        <div class="deal-card-header">
+          <div class="deal-client">{{ deal.client.name }}</div>
+          <button class="quick-log-btn" title="Log note/call"
+                  onclick="event.stopPropagation();openQuickLog({{ deal.id }}, '{{ deal.client.name|e }}')">+</button>
+        </div>
         {% if deal.client.company %}
           <div class="deal-company">{{ deal.client.company }}</div>
         {% endif %}
         <div class="deal-title">{{ deal.title }}</div>
+        {% if deal.label_list %}
+          <div class="task-labels" style="margin:4px 0">
+            {% for lbl in deal.label_list %}
+              <span class="deal-label-tag">{{ lbl }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
         <div class="deal-footer">
           <span class="deal-value">₹{{ "{:,.0f}".format(deal.value) }}</span>
-          <span class="deal-age {% if deal.days_in_stage > 7 %}age-warn{% endif %}">
-            {{ deal.days_in_stage }}d
-          </span>
+          <span class="deal-age {% if deal.days_in_stage > 7 %}age-warn{% endif %}">{{ deal.days_in_stage }}d</span>
         </div>
         {% if deal.salesperson %}
           <div class="deal-person">👤 {{ deal.salesperson }}</div>
@@ -59,10 +92,95 @@
 
 <div id="drag-toast" class="drag-toast hidden"></div>
 
+<!-- Quick-log modal -->
+<div id="quick-log-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeQuickLog()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Log Activity</h3>
+      <span id="quick-log-client" style="color:var(--text-sub);font-size:13px"></span>
+      <button onclick="closeQuickLog()" class="modal-close">✕</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Type</label>
+        <select id="ql-type" class="input-select">
+          <option value="call">Call</option>
+          <option value="meeting">Meeting</option>
+          <option value="email">Email</option>
+          <option value="follow_up">Follow-up</option>
+          <option value="demo">Demo</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Date & Time</label>
+        <input type="datetime-local" id="ql-time" class="input-text" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea id="ql-notes" class="input-textarea" rows="2" placeholder="What happened / agenda..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Outcome</label>
+      <textarea id="ql-outcome" class="input-textarea" rows="2" placeholder="Result / next steps..."></textarea>
+    </div>
+    <div class="form-actions">
+      <button onclick="closeQuickLog()" class="btn btn-secondary">Cancel</button>
+      <button onclick="submitQuickLog()" class="btn btn-primary">Log Activity</button>
+    </div>
+  </div>
+</div>
+
 <script>
-  let draggingEl = null;
-  let sourceStage = null;
-  let placeholder = null;
+  let quickLogDealId = null;
+
+  function openQuickLog(dealId, clientName) {
+    quickLogDealId = dealId;
+    document.getElementById("quick-log-client").textContent = clientName;
+    document.getElementById("ql-notes").value = "";
+    document.getElementById("ql-outcome").value = "";
+    // default to now
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    document.getElementById("ql-time").value = now.toISOString().slice(0,16);
+    document.getElementById("quick-log-modal").classList.remove("hidden");
+  }
+
+  function closeQuickLog() {
+    document.getElementById("quick-log-modal").classList.add("hidden");
+    quickLogDealId = null;
+  }
+
+  async function submitQuickLog() {
+    if (!quickLogDealId) return;
+    const btn = document.querySelector("#quick-log-modal .btn-primary");
+    btn.disabled = true;
+    btn.textContent = "Saving...";
+    try {
+      const res = await fetch(`/api/deal/${quickLogDealId}/quick-log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: document.getElementById("ql-type").value,
+          scheduled_at: document.getElementById("ql-time").value,
+          notes: document.getElementById("ql-notes").value,
+          outcome: document.getElementById("ql-outcome").value,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      closeQuickLog();
+      showToast("Activity logged ✓");
+    } catch {
+      showToast("Failed to log — try again", true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Log Activity";
+    }
+  }
+
+  // ── Drag and drop ──────────────────────────────────────────
+  let draggingEl = null, sourceStage = null, placeholder = null;
 
   function createPlaceholder() {
     const el = document.createElement("div");
@@ -72,136 +190,77 @@
 
   document.querySelectorAll(".deal-card").forEach(card => {
     card.addEventListener("dragstart", e => {
-      draggingEl = card;
-      sourceStage = card.dataset.stage;
+      draggingEl = card; sourceStage = card.dataset.stage;
       card.classList.add("dragging");
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", card.dataset.dealId);
       placeholder = createPlaceholder();
       setTimeout(() => card.style.opacity = "0.4", 0);
     });
-
     card.addEventListener("dragend", () => {
-      card.classList.remove("dragging");
-      card.style.opacity = "";
+      card.classList.remove("dragging"); card.style.opacity = "";
       if (placeholder && placeholder.parentNode) placeholder.remove();
-      placeholder = null;
-      draggingEl = null;
+      placeholder = null; draggingEl = null;
       document.querySelectorAll(".drop-zone").forEach(z => z.classList.remove("drag-over"));
     });
   });
 
   document.querySelectorAll(".drop-zone").forEach(zone => {
     zone.addEventListener("dragover", e => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
+      e.preventDefault(); e.dataTransfer.dropEffect = "move";
       zone.classList.add("drag-over");
-
-      // Position placeholder before the card being hovered
       const afterEl = getDragAfterElement(zone, e.clientY);
-      if (placeholder) {
-        if (afterEl == null) {
-          zone.appendChild(placeholder);
-        } else {
-          zone.insertBefore(placeholder, afterEl);
-        }
-      }
+      if (placeholder) afterEl == null ? zone.appendChild(placeholder) : zone.insertBefore(placeholder, afterEl);
     });
-
     zone.addEventListener("dragleave", e => {
-      if (!zone.contains(e.relatedTarget)) {
-        zone.classList.remove("drag-over");
-      }
+      if (!zone.contains(e.relatedTarget)) zone.classList.remove("drag-over");
     });
-
     zone.addEventListener("drop", async e => {
-      e.preventDefault();
-      zone.classList.remove("drag-over");
+      e.preventDefault(); zone.classList.remove("drag-over");
       if (!draggingEl) return;
-
       const dealId = draggingEl.dataset.dealId;
-      const newStage = zone.dataset.stage;
-      const oldStage = sourceStage;
-
-      if (newStage === oldStage) {
-        draggingEl.style.opacity = "";
-        return;
-      }
-
-      // Optimistically move the card
-      if (placeholder && placeholder.parentNode) {
-        zone.insertBefore(draggingEl, placeholder);
-        placeholder.remove();
-      } else {
-        zone.appendChild(draggingEl);
-      }
+      const newStage = zone.dataset.stage, oldStage = sourceStage;
+      if (newStage === oldStage) { draggingEl.style.opacity = ""; return; }
+      if (placeholder && placeholder.parentNode) { zone.insertBefore(draggingEl, placeholder); placeholder.remove(); }
+      else zone.appendChild(draggingEl);
       draggingEl.dataset.stage = newStage;
-
-      // Update empty state labels
-      updateEmptyState(oldStage);
-      updateEmptyState(newStage);
-      updateCount(oldStage);
-      updateCount(newStage);
-
-      // Persist to server
+      updateEmptyState(oldStage); updateEmptyState(newStage);
+      updateCount(oldStage); updateCount(newStage);
       try {
         const res = await fetch(`/api/deal/${dealId}/stage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ stage: newStage }),
         });
-        if (!res.ok) throw new Error("Server error");
+        if (!res.ok) throw new Error();
         showToast(`Moved to ${newStage.replace(/_/g, " ")}`);
       } catch {
-        // Rollback
         const oldZone = document.querySelector(`.drop-zone[data-stage="${oldStage}"]`);
-        oldZone.appendChild(draggingEl);
-        draggingEl.dataset.stage = oldStage;
-        updateEmptyState(oldStage);
-        updateEmptyState(newStage);
-        updateCount(oldStage);
-        updateCount(newStage);
+        oldZone.appendChild(draggingEl); draggingEl.dataset.stage = oldStage;
+        updateEmptyState(oldStage); updateEmptyState(newStage);
+        updateCount(oldStage); updateCount(newStage);
         showToast("Failed to update — try again", true);
       }
     });
   });
 
   function getDragAfterElement(container, y) {
-    const draggables = [...container.querySelectorAll(".deal-card:not(.dragging)")];
-    return draggables.reduce((closest, child) => {
-      const box = child.getBoundingClientRect();
-      const offset = y - box.top - box.height / 2;
-      if (offset < 0 && offset > closest.offset) {
-        return { offset, element: child };
-      }
-      return closest;
+    return [...container.querySelectorAll(".deal-card:not(.dragging)")].reduce((closest, child) => {
+      const box = child.getBoundingClientRect(), offset = y - box.top - box.height / 2;
+      return offset < 0 && offset > closest.offset ? { offset, element: child } : closest;
     }, { offset: Number.NEGATIVE_INFINITY }).element;
   }
-
   function updateEmptyState(stage) {
     const zone = document.querySelector(`.drop-zone[data-stage="${stage}"]`);
     const emptyEl = document.getElementById(`empty-${stage}`);
-    const cards = zone.querySelectorAll(".deal-card");
-    if (cards.length === 0) {
-      if (!emptyEl) {
-        const div = document.createElement("div");
-        div.className = "kanban-empty";
-        div.id = `empty-${stage}`;
-        div.textContent = "No deals";
-        zone.appendChild(div);
-      }
-    } else if (emptyEl) {
-      emptyEl.remove();
-    }
+    if (zone.querySelectorAll(".deal-card").length === 0) {
+      if (!emptyEl) { const d = document.createElement("div"); d.className="kanban-empty"; d.id=`empty-${stage}`; d.textContent="No deals"; zone.appendChild(d); }
+    } else if (emptyEl) emptyEl.remove();
   }
-
   function updateCount(stage) {
     const zone = document.querySelector(`.drop-zone[data-stage="${stage}"]`);
-    const count = zone.querySelectorAll(".deal-card").length;
     const el = document.getElementById(`count-${stage}`);
-    if (el) el.textContent = count;
+    if (el) el.textContent = zone.querySelectorAll(".deal-card").length;
   }
-
   function showToast(msg, isError = false) {
     const toast = document.getElementById("drag-toast");
     toast.textContent = msg;
