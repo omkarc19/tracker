@@ -115,6 +115,18 @@ class Target(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+# ── Team Members ──────────────────────────────────────────────────────────────
+
+class TeamMember(db.Model):
+    __tablename__ = "team_members"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False, unique=True)
+    email = db.Column(db.String(120))
+    role = db.Column(db.String(80))
+    active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 # ── Calendar ──────────────────────────────────────────────────────────────────
 
 EVENT_TYPES = ["meeting", "call", "demo", "internal", "other"]

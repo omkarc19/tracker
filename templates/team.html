@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Team — Sales Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Team Members</h1>
+  <span class="subtitle">Members appear in calendar attendee dropdowns</span>
+</div>
+
+<!-- Add / Edit Form -->
+<div class="form-card" style="max-width:540px;margin-bottom:28px">
+  <h3 id="form-heading" style="margin-bottom:16px;font-size:15px">Add Team Member</h3>
+  <form method="POST" id="team-form" action="{{ url_for('new_team_member') }}">
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label class="form-label">Name *</label>
+        <input type="text" name="name" id="f-name" class="form-input" required
+               placeholder="Full name" autofocus>
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Role</label>
+        <input type="text" name="role" id="f-role" class="form-input"
+               placeholder="e.g. Sales, Design">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" name="email" id="f-email" class="form-input"
+             placeholder="name@company.com">
+    </div>
+    <div class="form-actions">
+      <button type="button" id="btn-cancel" class="btn btn-secondary"
+              style="display:none" onclick="cancelEdit()">Cancel</button>
+      <button type="submit" id="btn-submit" class="btn btn-primary">Add Member</button>
+    </div>
+  </form>
+</div>
+
+<!-- Team list -->
+<div class="card" style="padding:0;overflow:hidden">
+  {% if members %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Role</th>
+        <th>Email</th>
+        <th>Added</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in members %}
+      <tr>
+        <td><strong>{{ m.name }}</strong></td>
+        <td>{{ m.role or '<span style="color:var(--text-sub)">—</span>'|safe }}</td>
+        <td>{{ m.email or '<span style="color:var(--text-sub)">—</span>'|safe }}</td>
+        <td style="color:var(--text-sub);font-size:12px">{{ m.created_at.strftime("%d %b %Y") }}</td>
+        <td style="text-align:right;white-space:nowrap;padding-right:12px">
+          <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;margin-right:4px"
+                  onclick="startEdit({{ m.id }}, {{ m.name|tojson }}, {{ (m.role or '')|tojson }}, {{ (m.email or '')|tojson }})">Edit</button>
+          <form method="POST" action="{{ url_for('delete_team_member', member_id=m.id) }}"
+                style="display:inline"
+                onsubmit="return confirm('Remove {{ m.name }} from team?')">
+            <button type="submit" class="btn btn-danger" style="font-size:11px;padding:4px 10px">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty-state" style="padding:32px">No team members yet. Add one above.</p>
+  {% endif %}
+</div>
+
+<script>
+const addUrl = "{{ url_for('new_team_member') }}";
+
+function startEdit(id, name, role, email) {
+  document.getElementById('form-heading').textContent = 'Edit Team Member';
+  document.getElementById('team-form').action = `/team/${id}/edit`;
+  document.getElementById('f-name').value  = name;
+  document.getElementById('f-role').value  = role;
+  document.getElementById('f-email').value = email;
+  document.getElementById('btn-submit').textContent = 'Save Changes';
+  document.getElementById('btn-cancel').style.display = '';
+  document.getElementById('f-name').focus();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelEdit() {
+  document.getElementById('form-heading').textContent = 'Add Team Member';
+  document.getElementById('team-form').action = addUrl;
+  document.getElementById('team-form').reset();
+  document.getElementById('btn-submit').textContent = 'Add Member';
+  document.getElementById('btn-cancel').style.display = 'none';
+}
+</script>
+{% endblock %}

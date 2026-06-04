@@ -12,7 +12,7 @@ import scheduler
 from models import (db, Client, Deal, Activity, STAGES, ACTIVITY_TYPES,
                     Task, TaskComment, TaskSubtask, TaskActivity,
                     TASK_STATUSES, TASK_PRIORITIES, TASK_LABELS, RECUR_INTERVALS,
-                    DEAL_LABELS, CalendarEvent, EVENT_TYPES)
+                    DEAL_LABELS, CalendarEvent, EVENT_TYPES, TeamMember)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -773,7 +773,8 @@ def export_tasks():
 
 @app.route("/calendar")
 def calendar_view():
-    all_attendees = set()
+    members = TeamMember.query.filter_by(active=True).order_by(TeamMember.name).all()
+    all_attendees = set(m.name for m in members)
     for ev in CalendarEvent.query.all():
         for a in ev.attendee_list:
             all_attendees.add(a)
@@ -870,6 +871,65 @@ def delete_calendar_event(event_id):
     db.session.commit()
     flash("Event deleted.", "info")
     return redirect(url_for("calendar_view"))
+
+
+# ── Team Members ──────────────────────────────────────────────────────────────
+
+@app.route("/team")
+def team_list():
+    members = TeamMember.query.order_by(TeamMember.name).all()
+    return render_template("team.html", members=members)
+
+
+@app.route("/team/new", methods=["POST"])
+def new_team_member():
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("Name is required.", "danger")
+        return redirect(url_for("team_list"))
+    existing = TeamMember.query.filter(db.func.lower(TeamMember.name) == name.lower()).first()
+    if existing:
+        flash(f"'{name}' already exists.", "info")
+    else:
+        db.session.add(TeamMember(
+            name=name,
+            email=request.form.get("email", "").strip() or None,
+            role=request.form.get("role", "").strip() or None,
+        ))
+        db.session.commit()
+        flash(f"{name} added to team.", "success")
+    return redirect(url_for("team_list"))
+
+
+@app.route("/team/<int:member_id>/edit", methods=["POST"])
+def edit_team_member(member_id):
+    m = TeamMember.query.get_or_404(member_id)
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("Name is required.", "danger")
+        return redirect(url_for("team_list"))
+    m.name = name
+    m.email = request.form.get("email", "").strip() or None
+    m.role = request.form.get("role", "").strip() or None
+    db.session.commit()
+    flash("Team member updated.", "success")
+    return redirect(url_for("team_list"))
+
+
+@app.route("/team/<int:member_id>/delete", methods=["POST"])
+def delete_team_member(member_id):
+    m = TeamMember.query.get_or_404(member_id)
+    name = m.name
+    db.session.delete(m)
+    db.session.commit()
+    flash(f"{name} removed from team.", "info")
+    return redirect(url_for("team_list"))
+
+
+@app.route("/api/team/members")
+def api_team_members():
+    members = TeamMember.query.filter_by(active=True).order_by(TeamMember.name).all()
+    return jsonify([{"id": m.id, "name": m.name, "role": m.role or ""} for m in members])
 
 
 if __name__ == "__main__":

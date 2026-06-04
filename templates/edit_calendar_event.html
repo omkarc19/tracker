@@ -10,7 +10,7 @@
 </div>
 
 <div class="form-card" style="max-width:640px">
-  <form method="POST">
+  <form method="POST" onsubmit="syncAttendees()">
     <div class="form-row">
       <div class="form-group" style="flex:2">
         <label class="form-label">Title *</label>
@@ -52,9 +52,23 @@
       </div>
     </div>
 
+    <!-- Attendee tag input — pre-filled from saved attendees -->
     <div class="form-group">
-      <label class="form-label">Attendees <small style="font-weight:400;color:var(--text-sub)">(comma-separated)</small></label>
-      <input type="text" name="attendees" class="form-input" value="{{ event.attendees or '' }}" placeholder="Alice, Bob">
+      <label class="form-label">Attendees
+        <small style="font-weight:400;color:var(--text-sub)">— select from team or type a temp name + Enter</small>
+      </label>
+      <div class="tag-input-wrapper">
+        <div class="tag-list" id="tag-list"></div>
+        <div class="tag-input-controls">
+          <select id="member-select" class="form-input" onchange="addFromSelect(this)">
+            <option value="">Add team member...</option>
+          </select>
+          <input type="text" id="temp-input" class="form-input"
+                 placeholder="Type name + Enter (temporary)"
+                 onkeydown="handleTemp(event)">
+        </div>
+      </div>
+      <input type="hidden" name="attendees" id="attendees-hidden" value="{{ event.attendees or '' }}">
     </div>
 
     <div class="form-group">
@@ -78,4 +92,58 @@
     </div>
   </form>
 </div>
+
+<script>
+// Pre-load existing attendees from the hidden field
+let tags = document.getElementById('attendees-hidden').value
+  .split(',').map(s => s.trim()).filter(Boolean);
+
+async function initAttendees() {
+  const resp = await fetch('/api/team/members');
+  const members = await resp.json();
+  const sel = document.getElementById('member-select');
+  members.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.name;
+    opt.textContent = m.name + (m.role ? ` (${m.role})` : '');
+    sel.appendChild(opt);
+  });
+  renderTags(); // show existing tags immediately
+}
+
+function addTag(name) {
+  name = name.trim();
+  if (!name || tags.some(t => t.toLowerCase() === name.toLowerCase())) return;
+  tags.push(name);
+  renderTags();
+}
+
+function removeTag(i) { tags.splice(i, 1); renderTags(); }
+
+function renderTags() {
+  document.getElementById('tag-list').innerHTML = tags.map((t, i) =>
+    `<span class="attendee-tag">${t}<button type="button" class="tag-remove" onclick="removeTag(${i})">×</button></span>`
+  ).join('');
+  document.getElementById('attendees-hidden').value = tags.join(',');
+}
+
+function addFromSelect(sel) {
+  if (sel.value) { addTag(sel.value); sel.value = ''; }
+}
+
+function handleTemp(e) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const val = e.target.value.replace(/,/g, '').trim();
+    if (val) { addTag(val); e.target.value = ''; }
+  }
+}
+
+function syncAttendees() {
+  const tmp = document.getElementById('temp-input').value.trim();
+  if (tmp) addTag(tmp);
+}
+
+initAttendees();
+</script>
 {% endblock %}

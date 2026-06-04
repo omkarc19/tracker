@@ -414,6 +414,17 @@ label { font-size: 12px; font-weight: 600; color: var(--text-sub); }
   .stage-cards { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
 }
 
+/* ── Tag Input (Attendees) ────────────────────────────────── */
+.tag-input-wrapper { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; background: var(--surface); }
+.tag-list { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+.tag-list:empty { margin-bottom: 0; }
+.attendee-tag { display: inline-flex; align-items: center; gap: 3px; background: #dbeafe; color: #1e40af; border-radius: 12px; padding: 3px 10px 3px 12px; font-size: 12px; font-weight: 600; }
+[data-theme="dark"] .attendee-tag { background: #1e3a5f; color: #93c5fd; }
+.tag-remove { background: none; border: none; cursor: pointer; color: inherit; font-size: 16px; padding: 0 0 0 2px; line-height: 1; opacity: 0.6; }
+.tag-remove:hover { opacity: 1; }
+.tag-input-controls { display: flex; gap: 8px; }
+.tag-input-controls .form-input { margin: 0; font-size: 13px; }
+
 /* ── Calendar ─────────────────────────────────────────────── */
 .cal-layout { display: flex; gap: 20px; align-items: flex-start; }
 .cal-panel { flex: 1; min-width: 0; }
