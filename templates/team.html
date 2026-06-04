@@ -58,7 +58,11 @@
         <td style="color:var(--text-sub);font-size:12px">{{ m.created_at.strftime("%d %b %Y") }}</td>
         <td style="text-align:right;white-space:nowrap;padding-right:12px">
           <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;margin-right:4px"
-                  onclick="startEdit({{ m.id }}, {{ m.name|tojson }}, {{ (m.role or '')|tojson }}, {{ (m.email or '')|tojson }})">Edit</button>
+                  data-id="{{ m.id }}"
+                  data-name="{{ m.name }}"
+                  data-role="{{ m.role or '' }}"
+                  data-email="{{ m.email or '' }}"
+                  onclick="startEdit(this.dataset.id, this.dataset.name, this.dataset.role, this.dataset.email)">Edit</button>
           <form method="POST" action="{{ url_for('delete_team_member', member_id=m.id) }}"
                 style="display:inline"
                 onsubmit="return confirm('Remove {{ m.name }} from team?')">
