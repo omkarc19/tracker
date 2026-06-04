@@ -17,6 +17,7 @@
       <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
       <a href="{{ url_for('pipeline') }}" class="{% if request.endpoint in ['pipeline', 'deal_detail'] %}active{% endif %}">Pipeline</a>
       <a href="{{ url_for('tasks_board') }}" class="{% if request.endpoint in ['tasks_board','task_detail','my_tasks','new_task'] %}active{% endif %}">Tasks</a>
+      <a href="{{ url_for('calendar_view') }}" class="{% if request.endpoint in ['calendar_view','calendar_event_detail','new_calendar_event','edit_calendar_event'] %}active{% endif %}">Calendar</a>
       <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">🌙</button>
       <a href="{{ url_for('new_client') }}" class="btn-nav">+ New Deal</a>
     </div>

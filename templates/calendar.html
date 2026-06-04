@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}Calendar — Sales Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Team Calendar</h1>
+  <a href="{{ url_for('new_calendar_event') }}" class="btn btn-primary">+ New Event</a>
+</div>
+
+<!-- Person filter -->
+<div class="filter-bar" style="margin-bottom:20px">
+  <label style="font-size:13px;font-weight:600;color:var(--text-sub)">View:</label>
+  <select id="person-filter" class="filter-select" onchange="applyPersonFilter()">
+    <option value="">All team members</option>
+    {% for person in all_attendees %}
+    <option value="{{ person }}">{{ person }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+<!-- Calendar + Sidebar layout -->
+<div class="cal-layout">
+  <!-- Month grid panel -->
+  <div class="cal-panel">
+    <div class="cal-nav">
+      <button onclick="prevMonth()" class="cal-nav-btn">&#8249;</button>
+      <h2 id="cal-title" class="cal-title"></h2>
+      <button onclick="nextMonth()" class="cal-nav-btn">&#8250;</button>
+    </div>
+    <div class="cal-weekdays">
+      <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div>
+      <div>Thu</div><div>Fri</div><div>Sat</div>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+  </div>
+
+  <!-- Day events sidebar -->
+  <div class="cal-sidebar">
+    <div id="cal-sidebar-content">
+      <p class="empty-state" style="padding-top:20px">Click a day to see events.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Upcoming events list -->
+<section class="section" style="margin-top:28px">
+  <h2 class="section-title">Upcoming Events This Month</h2>
+  <div id="upcoming-list"></div>
+</section>
+
+<script>
+const MONTH_NAMES = ['January','February','March','April','May','June',
+                     'July','August','September','October','November','December'];
+
+const EVENT_COLORS = {
+  meeting:  '#3b82f6',
+  call:     '#22c55e',
+  demo:     '#a855f7',
+  internal: '#f97316',
+  other:    '#6b7280',
+};
+
+const todayJs = new Date();
+const todayStr = todayJs.getFullYear() + '-' +
+  String(todayJs.getMonth()+1).padStart(2,'0') + '-' +
+  String(todayJs.getDate()).padStart(2,'0');
+
+let currentYear  = todayJs.getFullYear();
+let currentMonth = todayJs.getMonth(); // 0-indexed
+let currentPerson = '';
+let allEvents = [];
+
+function applyPersonFilter() {
+  currentPerson = document.getElementById('person-filter').value;
+  loadMonth(currentYear, currentMonth);
+}
+
+function prevMonth() {
+  currentMonth--;
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  loadMonth(currentYear, currentMonth);
+}
+
+function nextMonth() {
+  currentMonth++;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  loadMonth(currentYear, currentMonth);
+}
+
+async function loadMonth(year, month) {
+  const m = month + 1;
+  let url = `/api/calendar/events?year=${year}&month=${m}`;
+  if (currentPerson) url += `&person=${encodeURIComponent(currentPerson)}`;
+  const resp = await fetch(url);
+  allEvents = await resp.json();
+  renderGrid(year, month);
+  renderUpcoming();
+  document.getElementById('cal-sidebar-content').innerHTML =
+    '<p class="empty-state" style="padding-top:20px">Click a day to see events.</p>';
+}
+
+function dateStr(year, month, day) {
+  return `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+}
+
+function renderGrid(year, month) {
+  document.getElementById('cal-title').textContent = `${MONTH_NAMES[month]} ${year}`;
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+
+  const firstDow     = new Date(year, month, 1).getDay();
+  const daysInMonth  = new Date(year, month + 1, 0).getDate();
+  const daysInPrev   = new Date(year, month, 0).getDate();
+  const totalCells   = Math.ceil((firstDow + daysInMonth) / 7) * 7;
+
+  // Build event map: dateStr -> events[]
+  const eventMap = {};
+  for (const ev of allEvents) {
+    (eventMap[ev.date] = eventMap[ev.date] || []).push(ev);
+  }
+
+  for (let i = 0; i < totalCells; i++) {
+    let dayNum, ds, inMonth = true;
+    if (i < firstDow) {
+      dayNum = daysInPrev - firstDow + i + 1;
+      const py = month === 0 ? year-1 : year;
+      const pm = month === 0 ? 11 : month-1;
+      ds = dateStr(py, pm, dayNum);
+      inMonth = false;
+    } else if (i >= firstDow + daysInMonth) {
+      dayNum = i - firstDow - daysInMonth + 1;
+      const ny = month === 11 ? year+1 : year;
+      const nm = month === 11 ? 0 : month+1;
+      ds = dateStr(ny, nm, dayNum);
+      inMonth = false;
+    } else {
+      dayNum = i - firstDow + 1;
+      ds = dateStr(year, month, dayNum);
+    }
+
+    const cell = document.createElement('div');
+    cell.className = 'cal-day' + (inMonth ? '' : ' other-month') + (ds === todayStr ? ' today' : '');
+    cell.dataset.date = ds;
+
+    const numWrap = document.createElement('div');
+    numWrap.className = 'cal-day-num';
+    numWrap.textContent = dayNum;
+    cell.appendChild(numWrap);
+
+    const dayEvents = eventMap[ds] || [];
+    const maxShow = 3;
+    dayEvents.slice(0, maxShow).forEach(ev => {
+      const chip = document.createElement('div');
+      chip.className = 'cal-event-chip';
+      chip.style.background = EVENT_COLORS[ev.event_type] || EVENT_COLORS.other;
+      chip.textContent = (ev.start_time ? ev.start_time + ' ' : '') + ev.title;
+      chip.addEventListener('click', e => { e.stopPropagation(); showDayPanel(ds, dayEvents); });
+      cell.appendChild(chip);
+    });
+    if (dayEvents.length > maxShow) {
+      const more = document.createElement('div');
+      more.className = 'cal-more';
+      more.textContent = `+${dayEvents.length - maxShow} more`;
+      cell.appendChild(more);
+    }
+
+    if (inMonth) {
+      const addBtn = document.createElement('a');
+      addBtn.href = `/calendar/new?date=${ds}`;
+      addBtn.className = 'cal-add-btn';
+      addBtn.textContent = '+';
+      addBtn.title = 'Add event';
+      addBtn.addEventListener('click', e => e.stopPropagation());
+      cell.appendChild(addBtn);
+    }
+
+    cell.addEventListener('click', () => showDayPanel(ds, dayEvents));
+    grid.appendChild(cell);
+  }
+}
+
+function showDayPanel(ds, events) {
+  document.querySelectorAll('.cal-day.selected').forEach(c => c.classList.remove('selected'));
+  const cell = document.querySelector(`.cal-day[data-date="${ds}"]`);
+  if (cell) cell.classList.add('selected');
+
+  const [y, m, d] = ds.split('-').map(Number);
+  const dispDate = new Date(y, m-1, d);
+  const dateLabel = dispDate.toLocaleDateString('en-IN',
+    { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+  const sidebar = document.getElementById('cal-sidebar-content');
+  let html = `<div class="cal-sidebar-header">${dateLabel}</div>`;
+
+  if (events.length === 0) {
+    html += `<p class="empty-state">No events.</p>
+      <a href="/calendar/new?date=${ds}" class="btn btn-primary" style="display:inline-block;margin-top:8px;font-size:12px">+ Add Event</a>`;
+  } else {
+    html += `<div class="cal-day-events">`;
+    for (const ev of events) {
+      const color = EVENT_COLORS[ev.event_type] || EVENT_COLORS.other;
+      html += `
+        <a href="/calendar/${ev.id}" class="cal-event-card" style="border-left-color:${color}">
+          <div class="cal-event-title">${ev.title}</div>
+          ${ev.start_time ? `<div class="cal-event-time">⏰ ${ev.start_time}${ev.end_time ? ' – '+ev.end_time : ''}</div>` : ''}
+          ${ev.location  ? `<div class="cal-event-meta">📍 ${ev.location}</div>` : ''}
+          ${ev.attendees.length ? `<div class="cal-event-meta">👥 ${ev.attendees.join(', ')}</div>` : ''}
+          <span class="cal-type-tag" style="background:${color}20;color:${color}">${ev.event_type}</span>
+        </a>`;
+    }
+    html += `</div>
+      <a href="/calendar/new?date=${ds}" class="btn btn-secondary" style="display:inline-block;margin-top:12px;font-size:12px">+ Add Event</a>`;
+  }
+
+  sidebar.innerHTML = html;
+}
+
+function renderUpcoming() {
+  const upcoming = allEvents
+    .filter(ev => ev.date >= todayStr)
+    .sort((a,b) => a.date.localeCompare(b.date) || (a.start_time||'').localeCompare(b.start_time||''));
+
+  const el = document.getElementById('upcoming-list');
+  if (!upcoming.length) {
+    el.innerHTML = '<p class="empty-state">No upcoming events this month.</p>';
+    return;
+  }
+
+  let html = '';
+  let lastDate = '';
+  for (const ev of upcoming) {
+    if (ev.date !== lastDate) {
+      if (lastDate) html += '</div>';
+      const [y,m,d] = ev.date.split('-').map(Number);
+      const disp = new Date(y,m-1,d);
+      const label = ev.date === todayStr ? 'Today'
+        : disp.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
+      html += `<div class="upcoming-date-group"><div class="task-date-header">${label}</div>`;
+      lastDate = ev.date;
+    }
+    const color = EVENT_COLORS[ev.event_type] || EVENT_COLORS.other;
+    html += `
+      <a href="/calendar/${ev.id}" class="upcoming-event-row">
+        <span class="cal-type-dot" style="background:${color}"></span>
+        <span class="upcoming-event-title">${ev.title}</span>
+        ${ev.start_time ? `<span class="upcoming-event-time">${ev.start_time}</span>` : ''}
+        ${ev.attendees.length ? `<span class="upcoming-event-attendees">👥 ${ev.attendees.join(', ')}</span>` : ''}
+      </a>`;
+  }
+  if (lastDate) html += '</div>';
+  el.innerHTML = html;
+}
+
+// Boot
+loadMonth(currentYear, currentMonth);
+</script>
+{% endblock %}

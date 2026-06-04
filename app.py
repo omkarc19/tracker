@@ -12,7 +12,7 @@ import scheduler
 from models import (db, Client, Deal, Activity, STAGES, ACTIVITY_TYPES,
                     Task, TaskComment, TaskSubtask, TaskActivity,
                     TASK_STATUSES, TASK_PRIORITIES, TASK_LABELS, RECUR_INTERVALS,
-                    DEAL_LABELS)
+                    DEAL_LABELS, CalendarEvent, EVENT_TYPES)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -767,6 +767,109 @@ def export_tasks():
         mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+# ── Calendar ──────────────────────────────────────────────────────────────────
+
+@app.route("/calendar")
+def calendar_view():
+    all_attendees = set()
+    for ev in CalendarEvent.query.all():
+        for a in ev.attendee_list:
+            all_attendees.add(a)
+    return render_template("calendar.html", all_attendees=sorted(all_attendees))
+
+
+@app.route("/api/calendar/events")
+def api_calendar_events():
+    year = request.args.get("year", type=int)
+    month = request.args.get("month", type=int)
+    person = request.args.get("person", "").strip()
+
+    if not year or not month:
+        today = date.today()
+        year, month = today.year, today.month
+
+    first_day = date(year, month, 1)
+    if month == 12:
+        last_day = date(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        last_day = date(year, month + 1, 1) - timedelta(days=1)
+
+    events = (CalendarEvent.query
+              .filter(CalendarEvent.date >= first_day, CalendarEvent.date <= last_day)
+              .order_by(CalendarEvent.date, CalendarEvent.start_time)
+              .all())
+
+    if person:
+        events = [e for e in events if person in e.attendee_list or e.created_by == person]
+
+    return jsonify([e.to_dict() for e in events])
+
+
+@app.route("/calendar/new", methods=["GET", "POST"])
+def new_calendar_event():
+    if request.method == "POST":
+        date_raw = request.form.get("date", "").strip()
+        event_date = date.fromisoformat(date_raw) if date_raw else date.today()
+        event = CalendarEvent(
+            title=request.form["title"].strip(),
+            description=request.form.get("description", "").strip() or None,
+            date=event_date,
+            start_time=request.form.get("start_time", "").strip() or None,
+            end_time=request.form.get("end_time", "").strip() or None,
+            location=request.form.get("location", "").strip() or None,
+            meeting_link=request.form.get("meeting_link", "").strip() or None,
+            event_type=request.form.get("event_type", "meeting"),
+            attendees=request.form.get("attendees", "").strip(),
+            created_by=request.form.get("created_by", "").strip() or None,
+            notes=request.form.get("notes", "").strip() or None,
+        )
+        db.session.add(event)
+        db.session.commit()
+        flash("Event created.", "success")
+        return redirect(url_for("calendar_event_detail", event_id=event.id))
+
+    prefill_date = request.args.get("date", date.today().isoformat())
+    return render_template("new_calendar_event.html", prefill_date=prefill_date, event_types=EVENT_TYPES)
+
+
+@app.route("/calendar/<int:event_id>")
+def calendar_event_detail(event_id):
+    event = CalendarEvent.query.get_or_404(event_id)
+    return render_template("calendar_event.html", event=event, event_types=EVENT_TYPES)
+
+
+@app.route("/calendar/<int:event_id>/edit", methods=["GET", "POST"])
+def edit_calendar_event(event_id):
+    event = CalendarEvent.query.get_or_404(event_id)
+    if request.method == "POST":
+        date_raw = request.form.get("date", "").strip()
+        event.title = request.form["title"].strip()
+        event.description = request.form.get("description", "").strip() or None
+        event.date = date.fromisoformat(date_raw) if date_raw else event.date
+        event.start_time = request.form.get("start_time", "").strip() or None
+        event.end_time = request.form.get("end_time", "").strip() or None
+        event.location = request.form.get("location", "").strip() or None
+        event.meeting_link = request.form.get("meeting_link", "").strip() or None
+        event.event_type = request.form.get("event_type", "meeting")
+        event.attendees = request.form.get("attendees", "").strip()
+        event.created_by = request.form.get("created_by", "").strip() or None
+        event.notes = request.form.get("notes", "").strip() or None
+        event.updated_at = datetime.utcnow()
+        db.session.commit()
+        flash("Event updated.", "success")
+        return redirect(url_for("calendar_event_detail", event_id=event_id))
+    return render_template("edit_calendar_event.html", event=event, event_types=EVENT_TYPES)
+
+
+@app.route("/calendar/<int:event_id>/delete", methods=["POST"])
+def delete_calendar_event(event_id):
+    event = CalendarEvent.query.get_or_404(event_id)
+    db.session.delete(event)
+    db.session.commit()
+    flash("Event deleted.", "info")
+    return redirect(url_for("calendar_view"))
 
 
 if __name__ == "__main__":

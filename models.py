@@ -115,6 +115,48 @@ class Target(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+# ── Calendar ──────────────────────────────────────────────────────────────────
+
+EVENT_TYPES = ["meeting", "call", "demo", "internal", "other"]
+
+
+class CalendarEvent(db.Model):
+    __tablename__ = "calendar_events"
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    date = db.Column(db.Date, nullable=False)
+    start_time = db.Column(db.String(5))   # HH:MM
+    end_time = db.Column(db.String(5))     # HH:MM
+    location = db.Column(db.String(300))
+    meeting_link = db.Column(db.String(500))
+    event_type = db.Column(db.String(30), default="meeting")
+    attendees = db.Column(db.String(500), default="")  # comma-separated names
+    created_by = db.Column(db.String(120))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @property
+    def attendee_list(self):
+        return [a.strip() for a in (self.attendees or "").split(",") if a.strip()]
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "date": self.date.isoformat(),
+            "start_time": self.start_time or "",
+            "end_time": self.end_time or "",
+            "event_type": self.event_type,
+            "location": self.location or "",
+            "meeting_link": self.meeting_link or "",
+            "attendees": self.attendee_list,
+            "notes": self.notes or "",
+            "created_by": self.created_by or "",
+        }
+
+
 # ── Tasks ─────────────────────────────────────────────────────────────────────
 
 TASK_STATUSES = ["todo", "in_progress", "done"]

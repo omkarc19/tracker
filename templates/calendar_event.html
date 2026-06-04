@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ event.title }} — Calendar{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('calendar_view') }}" class="back-link">← Calendar</a>
+    <h1>{{ event.title }}</h1>
+    <div style="margin-top:4px">
+      <span class="cal-type-badge type-{{ event.event_type }}">{{ event.event_type.title() }}</span>
+      <span class="subtitle" style="margin-left:8px">{{ event.date.strftime("%A, %d %B %Y") }}</span>
+    </div>
+  </div>
+  <div class="header-actions">
+    <a href="{{ url_for('edit_calendar_event', event_id=event.id) }}" class="btn btn-secondary">Edit</a>
+    <form method="POST" action="{{ url_for('delete_calendar_event', event_id=event.id) }}"
+          onsubmit="return confirm('Delete this event?')">
+      <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
+  </div>
+</div>
+
+<div class="card" style="max-width:640px">
+  {% if event.start_time %}
+  <div class="detail-row">
+    <span class="detail-label">Time</span>
+    <span>{{ event.start_time }}{% if event.end_time %} – {{ event.end_time }}{% endif %}</span>
+  </div>
+  {% endif %}
+
+  {% if event.location %}
+  <div class="detail-row">
+    <span class="detail-label">Location</span>
+    <span>📍 {{ event.location }}</span>
+  </div>
+  {% endif %}
+
+  {% if event.meeting_link %}
+  <div class="detail-row">
+    <span class="detail-label">Link</span>
+    <a href="{{ event.meeting_link }}" target="_blank">🔗 Join meeting</a>
+  </div>
+  {% endif %}
+
+  {% if event.attendee_list %}
+  <div class="detail-row">
+    <span class="detail-label">Attendees</span>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      {% for a in event.attendee_list %}
+      <span class="deal-label-tag">👤 {{ a }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if event.created_by %}
+  <div class="detail-row">
+    <span class="detail-label">Created by</span>
+    <span>{{ event.created_by }}</span>
+  </div>
+  {% endif %}
+
+  {% if event.description %}
+  <div class="detail-row">
+    <span class="detail-label">Description</span>
+    <p style="margin:0">{{ event.description }}</p>
+  </div>
+  {% endif %}
+
+  {% if event.notes %}
+  <div class="detail-row">
+    <span class="detail-label">Notes</span>
+    <p style="margin:0;white-space:pre-wrap">{{ event.notes }}</p>
+  </div>
+  {% endif %}
+
+  <div class="detail-row" style="border:none">
+    <span class="detail-label">Created</span>
+    <span class="text-muted">{{ event.created_at.strftime("%d %b %Y, %H:%M") }}</span>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Edit Event — Calendar{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('calendar_event_detail', event_id=event.id) }}" class="back-link">← Event</a>
+    <h1>Edit Event</h1>
+  </div>
+</div>
+
+<div class="form-card" style="max-width:640px">
+  <form method="POST">
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label class="form-label">Title *</label>
+        <input type="text" name="title" class="form-input" required value="{{ event.title }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Type</label>
+        <select name="event_type" class="form-input">
+          {% for et in event_types %}
+          <option value="{{ et }}" {% if event.event_type == et %}selected{% endif %}>{{ et.title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Date *</label>
+        <input type="date" name="date" class="form-input" value="{{ event.date.isoformat() }}" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Start Time</label>
+        <input type="time" name="start_time" class="form-input" value="{{ event.start_time or '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">End Time</label>
+        <input type="time" name="end_time" class="form-input" value="{{ event.end_time or '' }}">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Location</label>
+        <input type="text" name="location" class="form-input" value="{{ event.location or '' }}" placeholder="Office / Zoom">
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Meeting Link</label>
+        <input type="url" name="meeting_link" class="form-input" value="{{ event.meeting_link or '' }}" placeholder="https://...">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Attendees <small style="font-weight:400;color:var(--text-sub)">(comma-separated)</small></label>
+      <input type="text" name="attendees" class="form-input" value="{{ event.attendees or '' }}" placeholder="Alice, Bob">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Created By</label>
+      <input type="text" name="created_by" class="form-input" value="{{ event.created_by or '' }}">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea name="description" class="form-input" rows="2">{{ event.description or '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Notes / Agenda</label>
+      <textarea name="notes" class="form-input" rows="3">{{ event.notes or '' }}</textarea>
+    </div>
+
+    <div class="form-actions">
+      <a href="{{ url_for('calendar_event_detail', event_id=event.id) }}" class="btn btn-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary">Save Changes</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
