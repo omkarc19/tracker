@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, date
+import base64
 import csv
 import io
 import logging
@@ -8,7 +9,7 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify, f
 import config
 import notifications
 import scheduler
-from models import (db, Client, Deal, Activity, Target, STAGES, ACTIVITY_TYPES,
+from models import (db, Client, Deal, Activity, STAGES, ACTIVITY_TYPES,
                     Task, TaskComment, TaskSubtask, TaskActivity,
                     TASK_STATUSES, TASK_PRIORITIES, TASK_LABELS, RECUR_INTERVALS,
                     DEAL_LABELS)
@@ -16,6 +17,33 @@ from models import (db, Client, Deal, Activity, Target, STAGES, ACTIVITY_TYPES,
 logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
+
+
+# ── Basic Auth ────────────────────────────────────────────────────────────────
+
+def _unauthorized():
+    return Response(
+        "Authentication required.",
+        401,
+        {"WWW-Authenticate": 'Basic realm="Sales Tracker"'},
+    )
+
+
+@app.before_request
+def require_auth():
+    # Skip auth for static files
+    if request.path.startswith("/static/"):
+        return
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Basic "):
+        return _unauthorized()
+    try:
+        decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
+        username, password = decoded.split(":", 1)
+    except Exception:
+        return _unauthorized()
+    if username != config.AUTH_USERNAME or password != config.AUTH_PASSWORD:
+        return _unauthorized()
 app.config["SQLALCHEMY_DATABASE_URI"] = config.DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SECRET_KEY"] = config.SECRET_KEY
@@ -105,8 +133,6 @@ def dashboard():
     ).all()
     won_value = sum(d.value for d in won_this_week)
 
-    weekly_target = Target.query.filter_by(period_type="weekly").order_by(Target.id.desc()).first()
-
     tasks_today = Task.query.filter(
         Task.due_date == today,
         Task.status != "done",
@@ -130,7 +156,6 @@ def dashboard():
         stages=STAGES,
         won_this_week=len(won_this_week),
         won_value=won_value,
-        weekly_target=weekly_target,
         tasks_today=tasks_today,
         tasks_tomorrow=tasks_tomorrow,
         overdue_tasks=overdue_tasks,
@@ -356,32 +381,6 @@ def delete_activity(activity_id):
     flash("Activity removed.", "info")
     return redirect(url_for("deal_detail", deal_id=deal_id))
 
-
-# ── Targets ───────────────────────────────────────────────────────────────────
-
-@app.route("/targets", methods=["GET", "POST"])
-def targets():
-    if request.method == "POST":
-        period_type = request.form["period_type"]
-        amount = float(request.form["amount"])
-        period_start = date.fromisoformat(request.form["period_start"])
-        target = Target(period_type=period_type, amount=amount, period_start=period_start)
-        db.session.add(target)
-        db.session.commit()
-        flash("Target saved.", "success")
-        return redirect(url_for("targets"))
-
-    all_targets = Target.query.order_by(Target.period_start.desc()).all()
-    return render_template("targets.html", targets=all_targets, today=date.today())
-
-
-@app.route("/targets/<int:target_id>/delete", methods=["POST"])
-def delete_target(target_id):
-    target = Target.query.get_or_404(target_id)
-    db.session.delete(target)
-    db.session.commit()
-    flash("Target deleted.", "info")
-    return redirect(url_for("targets"))
 
 
 # ── Tasks ─────────────────────────────────────────────────────────────────────

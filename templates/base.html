@@ -16,7 +16,6 @@
     <div class="nav-links">
       <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
       <a href="{{ url_for('pipeline') }}" class="{% if request.endpoint in ['pipeline', 'deal_detail'] %}active{% endif %}">Pipeline</a>
-      <a href="{{ url_for('targets') }}" class="{% if request.endpoint == 'targets' %}active{% endif %}">Targets</a>
       <a href="{{ url_for('tasks_board') }}" class="{% if request.endpoint in ['tasks_board','task_detail','my_tasks','new_task'] %}active{% endif %}">Tasks</a>
       <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">🌙</button>
       <a href="{{ url_for('new_client') }}" class="btn-nav">+ New Deal</a>

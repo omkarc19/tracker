@@ -24,7 +24,7 @@
   </div>
 </section>
 
-<!-- Weekly revenue vs target -->
+<!-- Weekly revenue -->
 <section class="section">
   <div class="metrics-row">
     <div class="metric-card">
@@ -32,22 +32,6 @@
       <div class="metric-value">{{ won_this_week }} deal{{ "s" if won_this_week != 1 else "" }}</div>
       <div class="metric-sub">₹{{ "{:,.0f}".format(won_value) }}</div>
     </div>
-    {% if weekly_target %}
-    <div class="metric-card">
-      <div class="metric-label">Weekly Target</div>
-      <div class="metric-value">₹{{ "{:,.0f}".format(weekly_target.amount) }}</div>
-      <div class="progress-bar">
-        {% set pct = [[(won_value / weekly_target.amount * 100)|int, 0]|max, 100]|min %}
-        <div class="progress-fill {% if pct >= 100 %}fill-green{% elif pct >= 60 %}fill-yellow{% else %}fill-red{% endif %}" style="width: {{ pct }}%"></div>
-      </div>
-      <div class="metric-sub">{{ pct }}% of target</div>
-    </div>
-    {% else %}
-    <div class="metric-card metric-muted">
-      <div class="metric-label">Weekly Target</div>
-      <div class="metric-sub"><a href="{{ url_for('targets') }}">Set a target →</a></div>
-    </div>
-    {% endif %}
   </div>
 </section>
 
