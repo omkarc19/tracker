@@ -831,6 +831,7 @@ def new_calendar_event():
         )
         db.session.add(event)
         db.session.commit()
+        notifications.notify_calendar_event_created(event)
         flash("Event created.", "success")
         return redirect(url_for("calendar_event_detail", event_id=event.id))
 
@@ -1014,6 +1015,7 @@ def new_interview():
         )
         db.session.add(app_obj)
         db.session.commit()
+        notifications.notify_interview_added(app_obj)
         flash(f"Application for {app_obj.company} added.", "success")
         return redirect(url_for("interview_detail", app_id=app_obj.id))
     return render_template(
@@ -1042,6 +1044,7 @@ def interview_detail(app_id):
 def edit_interview(app_id):
     app_obj = Application.query.get_or_404(app_id)
     if request.method == "POST":
+        old_status            = app_obj.status
         app_obj.company       = request.form["company"].strip()
         app_obj.role          = request.form["role"].strip()
         app_obj.source        = request.form.get("source", "naukri")
@@ -1059,6 +1062,8 @@ def edit_interview(app_id):
         app_obj.notes         = request.form.get("notes", "").strip() or None
         app_obj.updated_at    = datetime.utcnow()
         db.session.commit()
+        if app_obj.status != old_status:
+            notifications.notify_interview_status_changed(app_obj, old_status)
         flash("Application updated.", "success")
         return redirect(url_for("interview_detail", app_id=app_id))
     return render_template(
@@ -1087,9 +1092,12 @@ def api_interview_status(app_id):
     new_status = data.get("status")
     if new_status not in APPLICATION_STATUSES:
         return jsonify({"error": "invalid status"}), 400
+    old_status         = app_obj.status
     app_obj.status     = new_status
     app_obj.updated_at = datetime.utcnow()
     db.session.commit()
+    if new_status != old_status:
+        notifications.notify_interview_status_changed(app_obj, old_status)
     return jsonify({"ok": True})
 
 
@@ -1142,6 +1150,7 @@ def add_interview_round(app_id):
         app_obj.status = "in_progress"
 
     db.session.commit()
+    notifications.notify_interview_round_scheduled(app_obj, rnd)
     flash("Interview round added.", "success")
     return redirect(url_for("interview_detail", app_id=app_id))
 
@@ -1149,6 +1158,7 @@ def add_interview_round(app_id):
 @app.route("/interviews/round/<int:round_id>/update", methods=["POST"])
 def update_interview_round(round_id):
     rnd = InterviewRound.query.get_or_404(round_id)
+    old_result   = rnd.result
     rnd.result   = request.form.get("result", rnd.result)
     rnd.feedback = request.form.get("feedback", "").strip() or None
     sched_raw = request.form.get("scheduled_at", "").strip()
@@ -1158,6 +1168,8 @@ def update_interview_round(round_id):
         except ValueError:
             pass
     db.session.commit()
+    if rnd.result != old_result and rnd.result != "waiting":
+        notifications.notify_interview_round_result(rnd.application, rnd)
     flash("Round updated.", "success")
     return redirect(url_for("interview_detail", app_id=rnd.application_id))
 

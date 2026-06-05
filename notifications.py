@@ -176,3 +176,95 @@ def notify_task_done(task, completed_by: str) -> None:
         + (f"\nDeal: {task.deal.title}" if task.deal else "")
     )
     _send(msg)
+
+
+# ── Calendar notifications ────────────────────────────────────────────────────
+
+def notify_calendar_event_created(event) -> None:
+    type_emoji = {"meeting": "📅", "call": "📞", "demo": "🎯", "internal": "🏢", "other": "📌"}
+    emoji = type_emoji.get(event.event_type, "📅")
+    time_part = f" at {event.start_time}" if event.start_time else ""
+    attendee_part = f"\nAttendees: {event.attendees}" if event.attendees else ""
+    where_part = f"\nWhere: {event.location}" if event.location else (f"\nLink: {event.meeting_link}" if event.meeting_link else "")
+    msg = (
+        f"{emoji} <b>New Event Scheduled</b>\n"
+        f"{event.title}\n"
+        f"Date: {event.date.strftime('%d %b %Y')}{time_part}"
+        f"{attendee_part}"
+        f"{where_part}"
+        + (f"\nBy: {event.created_by}" if event.created_by and event.created_by != "system" else "")
+    )
+    _send(msg)
+
+
+# ── Interview notifications ───────────────────────────────────────────────────
+
+def notify_interview_added(app_obj) -> None:
+    ctc_part = f"\nExpected: ₹{app_obj.expected_ctc:.1f} LPA" if app_obj.expected_ctc else ""
+    msg = (
+        f"🆕 <b>New Application Added</b>\n"
+        f"Company: {app_obj.company}\n"
+        f"Role: {app_obj.role}\n"
+        f"Source: {app_obj.source.title()}"
+        f"{ctc_part}"
+    )
+    _send(msg)
+
+
+def notify_interview_status_changed(app_obj, old_status: str) -> None:
+    status_emoji = {
+        "applied": "📝", "shortlisted": "⭐", "in_progress": "🔄",
+        "offer_received": "🎉", "accepted": "🏆", "rejected": "❌", "withdrawn": "🚫",
+    }
+    new_status = app_obj.status
+    emoji = status_emoji.get(new_status, "📌")
+    old_label = old_status.replace("_", " ").title()
+    new_label = new_status.replace("_", " ").title()
+    msg = (
+        f"{emoji} <b>Application Status Updated</b>\n"
+        f"Company: {app_obj.company} — {app_obj.role}\n"
+        f"{old_label} → <b>{new_label}</b>"
+        + (f"\nOffered CTC: ₹{app_obj.offered_ctc:.1f} LPA" if new_status == "offer_received" and app_obj.offered_ctc else "")
+    )
+    _send(msg)
+
+
+def notify_interview_round_scheduled(app_obj, rnd) -> None:
+    type_label = {
+        "hr_screening": "HR Screening", "technical": "Technical", "managerial": "Managerial",
+        "hr_final": "HR Final", "salary_discussion": "Salary Discussion",
+        "assignment": "Assignment", "other": "Other",
+    }
+    mode_emoji = {"phone": "📞", "video": "💻", "in_person": "🏢"}
+    label = type_label.get(rnd.round_type, rnd.round_type)
+    mode_icon = mode_emoji.get(rnd.mode, "")
+    time_part = rnd.scheduled_at.strftime("%d %b %Y, %I:%M %p") if rnd.scheduled_at else "TBD"
+    msg = (
+        f"📋 <b>Interview Round Scheduled — R{rnd.round_number}</b>\n"
+        f"Company: {app_obj.company}\n"
+        f"Round: {label}\n"
+        f"When: {time_part}\n"
+        f"Mode: {mode_icon} {rnd.mode.replace('_', ' ').title()}"
+        + (f"\nInterviewer: {rnd.interviewer}" if rnd.interviewer else "")
+        + (f"\nLink: {rnd.meeting_link}" if rnd.meeting_link else "")
+    )
+    _send(msg)
+
+
+def notify_interview_round_result(app_obj, rnd) -> None:
+    result_emoji = {"cleared": "✅", "not_cleared": "❌", "cancelled": "🚫", "waiting": "⏳"}
+    emoji = result_emoji.get(rnd.result, "📌")
+    type_label = {
+        "hr_screening": "HR Screening", "technical": "Technical", "managerial": "Managerial",
+        "hr_final": "HR Final", "salary_discussion": "Salary Discussion",
+        "assignment": "Assignment", "other": "Other",
+    }
+    label = type_label.get(rnd.round_type, rnd.round_type)
+    msg = (
+        f"{emoji} <b>Round Result Updated</b>\n"
+        f"Company: {app_obj.company}\n"
+        f"Round {rnd.round_number}: {label}\n"
+        f"Result: <b>{rnd.result.replace('_', ' ').title()}</b>"
+        + (f"\nFeedback: {rnd.feedback}" if rnd.feedback else "")
+    )
+    _send(msg)
