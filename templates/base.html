@@ -18,6 +18,7 @@
       <a href="{{ url_for('pipeline') }}" class="{% if request.endpoint in ['pipeline', 'deal_detail'] %}active{% endif %}">Pipeline</a>
       <a href="{{ url_for('tasks_board') }}" class="{% if request.endpoint in ['tasks_board','task_detail','my_tasks','new_task'] %}active{% endif %}">Tasks</a>
       <a href="{{ url_for('calendar_view') }}" class="{% if request.endpoint in ['calendar_view','calendar_event_detail','new_calendar_event','edit_calendar_event'] %}active{% endif %}">Calendar</a>
+      <a href="{{ url_for('interviews') }}" class="{% if request.endpoint in ['interviews','interview_detail','new_interview','edit_interview','interview_offers'] %}active{% endif %}">Interviews</a>
       <a href="{{ url_for('team_list') }}" class="{% if request.endpoint in ['team_list'] %}active{% endif %}">Team</a>
       <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">🌙</button>
       <a href="{{ url_for('new_client') }}" class="btn-nav">+ New Deal</a>

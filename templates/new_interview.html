@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}New Application — Interviews{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('interviews') }}" class="back-link">← Interview Tracker</a>
+    <h1>New Application</h1>
+  </div>
+</div>
+
+<div class="form-card" style="max-width:680px">
+  <form method="POST">
+
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label class="form-label">Company *</label>
+        <input type="text" name="company" class="form-input" required autofocus placeholder="e.g. Google, Rippling">
+      </div>
+      <div class="form-group" style="flex:2">
+        <label class="form-label">Role / Position *</label>
+        <input type="text" name="role" class="form-input" required placeholder="e.g. Senior Software Engineer">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Source</label>
+        <select name="source" class="form-input">
+          {% for s in sources %}
+          <option value="{{ s }}">{{ s.title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Applied Date</label>
+        <input type="date" name="applied_date" class="form-input" value="{{ today }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select name="status" class="form-input">
+          {% for s in statuses %}
+          <option value="{{ s }}" {% if s == "applied" %}selected{% endif %}>{{ s.replace("_"," ").title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <h4 style="font-size:13px;font-weight:600;color:var(--text-sub);margin-bottom:10px">CTC Details (LPA)</h4>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Current CTC</label>
+        <input type="number" name="current_ctc" class="form-input" step="0.1" placeholder="e.g. 8.5">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Expected CTC</label>
+        <input type="number" name="expected_ctc" class="form-input" step="0.1" placeholder="e.g. 14">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Offered CTC</label>
+        <input type="number" name="offered_ctc" class="form-input" step="0.1" placeholder="fill when offered">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Work Mode</label>
+        <select name="work_mode" class="form-input">
+          <option value="">— Select —</option>
+          {% for m in work_modes %}
+          <option value="{{ m }}">{{ m.replace("_"," ").title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">City / Location</label>
+        <input type="text" name="city" class="form-input" placeholder="e.g. Bangalore, Mumbai">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notice Period (days)</label>
+        <input type="number" name="notice_period" class="form-input" placeholder="e.g. 30">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Expected Joining Date</label>
+        <input type="date" name="joining_date" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">HR Name</label>
+        <input type="text" name="hr_name" class="form-input" placeholder="Recruiter / HR name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">HR Contact</label>
+        <input type="text" name="hr_contact" class="form-input" placeholder="Phone or email">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <textarea name="notes" class="form-input" rows="3" placeholder="Job description highlights, referral info, etc."></textarea>
+    </div>
+
+    <div class="form-actions">
+      <a href="{{ url_for('interviews') }}" class="btn btn-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary">Add Application</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Interviews — Sales Tracker{% endblock %}
+
+{% block content %}
+{% set sc = {
+  "applied":        {"label":"Applied",        "emoji":"📝"},
+  "shortlisted":    {"label":"Shortlisted",    "emoji":"✅"},
+  "in_progress":    {"label":"In Progress",    "emoji":"🔄"},
+  "offer_received": {"label":"Offer Received", "emoji":"🎉"},
+  "accepted":       {"label":"Accepted",       "emoji":"🏆"},
+  "rejected":       {"label":"Rejected",       "emoji":"❌"},
+  "withdrawn":      {"label":"Withdrawn",      "emoji":"↩️"},
+} %}
+
+<div class="page-header">
+  <div>
+    <h1>Interview Tracker</h1>
+    <span class="subtitle">{{ total }} application{{ "s" if total != 1 }}</span>
+  </div>
+  <div class="header-actions">
+    <a href="{{ url_for('interview_offers') }}" class="btn btn-secondary">📊 Compare Offers</a>
+    <a href="{{ url_for('new_interview') }}" class="btn btn-primary">+ New Application</a>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="filter-bar" style="margin-bottom:16px">
+  <form method="GET" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <select name="source" class="filter-select" onchange="this.form.submit()">
+      <option value="">All Sources</option>
+      {% for s in sources %}
+      <option value="{{ s }}" {% if source_filter == s %}selected{% endif %}>{{ s.title() }}</option>
+      {% endfor %}
+    </select>
+    <select name="mode" class="filter-select" onchange="this.form.submit()">
+      <option value="">All Work Modes</option>
+      {% for m in work_modes %}
+      <option value="{{ m }}" {% if mode_filter == m %}selected{% endif %}>{{ m.replace("_"," ").title() }}</option>
+      {% endfor %}
+    </select>
+    {% if source_filter or mode_filter %}
+    <a href="{{ url_for('interviews') }}" class="btn btn-secondary" style="font-size:12px;padding:5px 10px">✕ Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- Summary strip -->
+{% set active = apps_by_status["applied"]|length + apps_by_status["shortlisted"]|length + apps_by_status["in_progress"]|length %}
+{% set offers = apps_by_status["offer_received"]|length + apps_by_status["accepted"]|length %}
+<div class="metrics-row" style="margin-bottom:20px">
+  <div class="metric-card">
+    <div class="metric-label">Active</div>
+    <div class="metric-value">{{ active }}</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Offers in Hand</div>
+    <div class="metric-value" style="color:var(--green)">{{ offers }}</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Total Applied</div>
+    <div class="metric-value">{{ total }}</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Rejected / Withdrawn</div>
+    <div class="metric-value" style="color:var(--text-sub)">{{ apps_by_status["rejected"]|length + apps_by_status["withdrawn"]|length }}</div>
+  </div>
+</div>
+
+<!-- Kanban -->
+<div class="kanban-board" id="interview-board">
+  {% for status in statuses %}
+  {% set cfg = sc[status] %}
+  {% set apps = apps_by_status[status] %}
+  <div class="kanban-col" id="col-{{ status }}"
+       ondragover="event.preventDefault()"
+       ondrop="dropApp(event, '{{ status }}')">
+    <div class="kanban-header int-header-{{ status }}">
+      <span>{{ cfg.emoji }} {{ cfg.label }}</span>
+      <span class="kanban-count">{{ apps|length }}</span>
+    </div>
+    <div class="kanban-cards drop-zone" id="drop-{{ status }}">
+      {% for a in apps %}
+      <div class="app-card" draggable="true"
+           data-app-id="{{ a.id }}" data-status="{{ a.status }}"
+           ondragstart="dragApp(event, {{ a.id }}, '{{ a.status }}')"
+           onclick="window.location='{{ url_for('interview_detail', app_id=a.id) }}'">
+        <div class="app-company">{{ a.company }}</div>
+        <div class="app-role">{{ a.role }}</div>
+        <div class="app-badges">
+          <span class="app-source-badge src-{{ a.source }}">{{ a.source }}</span>
+          {% if a.work_mode %}<span class="app-mode-badge">{{ a.work_mode.replace("_"," ") }}</span>{% endif %}
+          {% if a.city %}<span class="app-city">📍 {{ a.city }}</span>{% endif %}
+        </div>
+        {% if a.offered_ctc %}
+          <div class="app-ctc">₹{{ a.offered_ctc }} LPA <span style="font-size:10px;font-weight:400">offered</span></div>
+        {% elif a.expected_ctc %}
+          <div class="app-ctc app-ctc-exp">₹{{ a.expected_ctc }} LPA <span style="font-size:10px;font-weight:400">expected</span></div>
+        {% endif %}
+        {% if a.next_round %}
+          <div class="app-next-round">🗓 {{ a.next_round.round_type.replace("_"," ").title() }} · {{ a.next_round.scheduled_at.strftime("%d %b, %I:%M %p") }}</div>
+        {% endif %}
+        <div class="app-card-footer">
+          <span>{{ a.days_since_applied }}d ago</span>
+          {% if a.rounds %}<span>{{ a.rounds_cleared }}/{{ a.rounds|length }} rounds</span>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      {% if not apps %}<div class="kanban-empty">No applications</div>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div id="drag-toast" class="drag-toast" style="display:none"></div>
+
+<script>
+let draggedId = null, draggedFrom = null;
+
+function dragApp(e, id, status) {
+  draggedId = id; draggedFrom = status;
+  e.dataTransfer.effectAllowed = "move";
+  setTimeout(() => e.target.classList.add("dragging"), 0);
+}
+document.addEventListener("dragend", () =>
+  document.querySelectorAll(".app-card.dragging").forEach(c => c.classList.remove("dragging")));
+
+document.querySelectorAll(".drop-zone").forEach(z => {
+  z.addEventListener("dragover", e => { e.preventDefault(); z.classList.add("drag-over"); });
+  z.addEventListener("dragleave", () => z.classList.remove("drag-over"));
+});
+
+async function dropApp(e, newStatus) {
+  e.preventDefault();
+  document.querySelectorAll(".drop-zone").forEach(z => z.classList.remove("drag-over"));
+  if (!draggedId || newStatus === draggedFrom) return;
+  const card = document.querySelector(`.app-card[data-app-id="${draggedId}"]`);
+  const from = document.getElementById(`drop-${draggedFrom}`);
+  const to   = document.getElementById(`drop-${newStatus}`);
+  to.insertBefore(card, to.firstChild);
+  card.dataset.status = newStatus;
+  bump(draggedFrom, -1); bump(newStatus, +1);
+  try {
+    const r = await fetch(`/api/interviews/${draggedId}/status`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({status: newStatus})
+    });
+    if (!r.ok) throw new Error();
+    toast(`Moved to ${newStatus.replace(/_/g," ")}`);
+    draggedFrom = newStatus;
+  } catch {
+    from.insertBefore(card, from.firstChild);
+    card.dataset.status = draggedFrom;
+    bump(newStatus, -1); bump(draggedFrom, +1);
+    toast("Update failed", true);
+  }
+}
+function bump(status, d) {
+  const b = document.querySelector(`#col-${status} .kanban-count`);
+  if (b) b.textContent = Math.max(0, parseInt(b.textContent) + d);
+}
+function toast(msg, err=false) {
+  const t = document.getElementById("drag-toast");
+  t.textContent = msg;
+  t.style.background = err ? "var(--red)" : "#1a1a2e";
+  t.style.display = "block";
+  setTimeout(() => t.style.display = "none", 2200);
+}
+</script>
+{% endblock %}

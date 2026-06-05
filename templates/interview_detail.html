@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block title %}{{ app.company }} — Interviews{% endblock %}
+
+{% block content %}
+{% set result_cfg = {
+  "waiting":     {"label":"Waiting",     "cls":"rr-waiting"},
+  "cleared":     {"label":"Cleared ✓",   "cls":"rr-cleared"},
+  "not_cleared": {"label":"Not Cleared", "cls":"rr-fail"},
+  "cancelled":   {"label":"Cancelled",   "cls":"rr-cancel"},
+} %}
+{% set type_label = {
+  "hr_screening":"HR Screening","technical":"Technical","managerial":"Managerial",
+  "hr_final":"HR Final","salary_discussion":"Salary Discussion","assignment":"Assignment","other":"Other"
+} %}
+
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('interviews') }}" class="back-link">← Interview Tracker</a>
+    <h1>{{ app.company }}</h1>
+    <div class="deal-meta" style="margin-top:6px">
+      <span class="app-status-tag app-st-{{ app.status }}">{{ app.status.replace("_"," ").title() }}</span>
+      <span style="font-size:13px;color:var(--text-sub)">{{ app.role }}</span>
+      {% if app.work_mode %}<span class="app-mode-badge">{{ app.work_mode.replace("_"," ").title() }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="header-actions">
+    <a href="{{ url_for('edit_interview', app_id=app.id) }}" class="btn btn-secondary">Edit</a>
+    <form method="POST" action="{{ url_for('delete_interview', app_id=app.id) }}"
+          onsubmit="return confirm('Delete this application?')">
+      <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
+  </div>
+</div>
+
+<div class="deal-layout">
+
+  <!-- Sidebar -->
+  <div class="deal-sidebar">
+
+    <!-- Application details -->
+    <div class="card">
+      <h3>Details</h3>
+      <dl class="info-list">
+        <dt>Source</dt>     <dd><span class="app-source-badge src-{{ app.source }}">{{ app.source }}</span></dd>
+        <dt>Applied</dt>    <dd>{{ app.applied_date.strftime("%d %b %Y") if app.applied_date else "—" }} <span style="color:var(--text-sub);font-size:11px">({{ app.days_since_applied }}d ago)</span></dd>
+        {% if app.city %}<dt>Location</dt><dd>📍 {{ app.city }}</dd>{% endif %}
+        {% if app.notice_period %}<dt>Notice</dt><dd>{{ app.notice_period }} days</dd>{% endif %}
+        {% if app.joining_date %}<dt>Joining</dt><dd>{{ app.joining_date.strftime("%d %b %Y") }}</dd>{% endif %}
+      </dl>
+      <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+        <div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:8px">CTC (LPA)</div>
+        <div class="ctc-row">
+          <span class="ctc-label">Current</span>
+          <span class="ctc-val">{{ "₹%.1f"|format(app.current_ctc) if app.current_ctc else "—" }}</span>
+        </div>
+        <div class="ctc-row">
+          <span class="ctc-label">Expected</span>
+          <span class="ctc-val">{{ "₹%.1f"|format(app.expected_ctc) if app.expected_ctc else "—" }}</span>
+        </div>
+        {% if app.offered_ctc %}
+        <div class="ctc-row" style="font-weight:700;color:var(--green)">
+          <span class="ctc-label">Offered</span>
+          <span class="ctc-val">₹{{ "%.1f"|format(app.offered_ctc) }}</span>
+        </div>
+        {% if app.current_ctc and app.offered_ctc %}
+        {% set hike = ((app.offered_ctc - app.current_ctc) / app.current_ctc * 100)|round(1) %}
+        <div class="ctc-row">
+          <span class="ctc-label">Hike</span>
+          <span class="ctc-val {% if hike > 0 %}hike-pos{% else %}hike-neg{% endif %}">{{ "+" if hike > 0 }}{{ hike }}%</span>
+        </div>
+        {% endif %}
+        {% endif %}
+      </div>
+      {% if app.hr_name or app.hr_contact %}
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;font-size:12px">
+        <div style="font-weight:600;color:var(--text-sub);margin-bottom:4px">HR Contact</div>
+        {% if app.hr_name %}<div>{{ app.hr_name }}</div>{% endif %}
+        {% if app.hr_contact %}<div style="color:var(--primary)">{{ app.hr_contact }}</div>{% endif %}
+      </div>
+      {% endif %}
+      {% if app.notes %}
+      <div class="notes-block" style="margin-top:12px">{{ app.notes }}</div>
+      {% endif %}
+    </div>
+
+    <!-- Status quick-change -->
+    <div class="card">
+      <h3>Move Status</h3>
+      <form method="POST" action="{{ url_for('edit_interview', app_id=app.id) }}"
+            style="display:flex;flex-direction:column;gap:6px">
+        <input type="hidden" name="company"   value="{{ app.company }}">
+        <input type="hidden" name="role"      value="{{ app.role }}">
+        <input type="hidden" name="source"    value="{{ app.source or '' }}">
+        <input type="hidden" name="work_mode" value="{{ app.work_mode or '' }}">
+        <select name="status" class="form-input" style="margin-bottom:6px">
+          {% for s in statuses %}
+          <option value="{{ s }}" {% if app.status == s %}selected{% endif %}>{{ s.replace("_"," ").title() }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary" style="font-size:12px">Update Status</button>
+      </form>
+    </div>
+
+    <!-- Documents checklist -->
+    <div class="card">
+      <h3>Documents
+        {% if app.documents %}
+          <span class="badge">{{ app.docs_done }}/{{ app.documents|length }}</span>
+        {% endif %}
+      </h3>
+      {% if app.documents %}
+        {% set total_d = app.documents|length %}
+        {% set done_d  = app.docs_done %}
+        <div class="progress-bar" style="margin-bottom:10px">
+          <div class="progress-fill fill-green" style="width:{{ (done_d/total_d*100)|int }}%"></div>
+        </div>
+        {% for doc in app.documents %}
+        <div class="subtask-row">
+          <form method="POST" action="{{ url_for('toggle_app_doc', doc_id=doc.id) }}" style="display:inline">
+            <button type="submit" class="subtask-check {% if doc.done %}subtask-done{% endif %}">
+              {% if doc.done %}☑{% else %}☐{% endif %}
+            </button>
+          </form>
+          <span class="subtask-title {% if doc.done %}done-text{% endif %}">{{ doc.title }}</span>
+          <form method="POST" action="{{ url_for('delete_app_doc', doc_id=doc.id) }}" style="margin-left:auto">
+            <button type="submit" class="btn-link-danger">✕</button>
+          </form>
+        </div>
+        {% endfor %}
+      {% endif %}
+      <form method="POST" action="{{ url_for('add_app_doc', app_id=app.id) }}" class="subtask-form" style="margin-top:10px">
+        <input type="text" name="title" class="input-text" placeholder="e.g. Resume, Aadhar, Offer letter…" required>
+        <button type="submit" class="btn btn-secondary">Add</button>
+      </form>
+    </div>
+
+  </div>
+
+  <!-- Main: rounds + add round -->
+  <div class="deal-main">
+
+    <!-- Add round form -->
+    <div class="card" style="margin-bottom:16px">
+      <h3 style="cursor:pointer;user-select:none" onclick="toggleAddRound()">
+        + Schedule Interview Round <span id="add-round-arrow" style="font-size:12px;color:var(--text-sub)">▸ expand</span>
+      </h3>
+      <div id="add-round-form" style="display:none;margin-top:14px">
+        <form method="POST" action="{{ url_for('add_interview_round', app_id=app.id) }}">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Round Type</label>
+              <select name="round_type" class="form-input">
+                {% for rt in round_types %}
+                <option value="{{ rt }}">{{ type_label[rt] }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Mode</label>
+              <select name="mode" class="form-input">
+                {% for m in round_modes %}
+                <option value="{{ m }}">{{ m.replace("_"," ").title() }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Date & Time</label>
+              <input type="datetime-local" name="scheduled_at" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Interviewer</label>
+              <input type="text" name="interviewer" class="form-input" placeholder="Name / Panel">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Meeting Link</label>
+              <input type="url" name="meeting_link" class="form-input" placeholder="https://...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Location</label>
+              <input type="text" name="location" class="form-input" placeholder="Office address / Online">
+            </div>
+          </div>
+          <div class="form-actions" style="justify-content:flex-start">
+            <button type="submit" class="btn btn-primary">Schedule Round</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Rounds timeline -->
+    <div class="card">
+      <h3>Interview Rounds
+        <span class="badge">{{ app.rounds|length }}</span>
+        {% if app.rounds %}<span style="font-size:11px;font-weight:400;color:var(--green);margin-left:6px">{{ app.rounds_cleared }} cleared</span>{% endif %}
+      </h3>
+
+      {% if app.rounds %}
+      <div class="round-list">
+        {% for rnd in app.rounds %}
+        <div class="round-card rr-border-{{ rnd.result }}">
+          <div class="round-header">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="round-num">R{{ rnd.round_number }}</span>
+              <span class="round-type-tag">{{ type_label.get(rnd.round_type, rnd.round_type) }}</span>
+              <span class="round-result-badge {{ result_cfg[rnd.result].cls }}">{{ result_cfg[rnd.result].label }}</span>
+            </div>
+            <form method="POST" action="{{ url_for('delete_interview_round', round_id=rnd.id) }}"
+                  onsubmit="return confirm('Remove this round?')">
+              <button type="submit" class="btn-link-danger" style="font-size:11px">remove</button>
+            </form>
+          </div>
+          <div class="round-meta">
+            {% if rnd.scheduled_at %}
+              <span>🗓 {{ rnd.scheduled_at.strftime("%d %b %Y, %I:%M %p") }}</span>
+            {% endif %}
+            {% if rnd.mode %}<span>{{ {"phone":"📞","video":"💻","in_person":"🏢"}[rnd.mode] }} {{ rnd.mode.replace("_"," ").title() }}</span>{% endif %}
+            {% if rnd.interviewer %}<span>👤 {{ rnd.interviewer }}</span>{% endif %}
+            {% if rnd.meeting_link %}<span><a href="{{ rnd.meeting_link }}" target="_blank">🔗 Join</a></span>{% endif %}
+            {% if rnd.location %}<span>📍 {{ rnd.location }}</span>{% endif %}
+          </div>
+          {% if rnd.feedback %}
+          <div class="round-feedback">{{ rnd.feedback }}</div>
+          {% endif %}
+
+          <!-- Inline update form -->
+          <details class="round-update-details">
+            <summary class="round-update-toggle">Update result / feedback</summary>
+            <form method="POST" action="{{ url_for('update_interview_round', round_id=rnd.id) }}" style="margin-top:10px">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Result</label>
+                  <select name="result" class="form-input">
+                    {% for r in round_results %}
+                    <option value="{{ r }}" {% if rnd.result == r %}selected{% endif %}>{{ r.replace("_"," ").title() }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Reschedule (optional)</label>
+                  <input type="datetime-local" name="scheduled_at" class="form-input"
+                         value="{{ rnd.scheduled_at.strftime('%Y-%m-%dT%H:%M') if rnd.scheduled_at else '' }}">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Feedback / Notes</label>
+                <textarea name="feedback" class="form-input" rows="2" placeholder="What went well, what to improve…">{{ rnd.feedback or '' }}</textarea>
+              </div>
+              <button type="submit" class="btn btn-primary" style="font-size:12px">Save</button>
+            </form>
+          </details>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+        <p class="empty-state">No rounds scheduled yet. Add the first round above.</p>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<script>
+function toggleAddRound() {
+  const f = document.getElementById('add-round-form');
+  const a = document.getElementById('add-round-arrow');
+  const open = f.style.display !== 'none';
+  f.style.display = open ? 'none' : 'block';
+  a.textContent   = open ? '▸ expand' : '▾ collapse';
+}
+</script>
+{% endblock %}

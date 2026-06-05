@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -248,3 +248,89 @@ class TaskActivity(db.Model):
     actor = db.Column(db.String(120))
     action = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ── Interviews ────────────────────────────────────────────────────────────────
+
+APPLICATION_STATUSES = ["applied", "shortlisted", "in_progress", "offer_received", "accepted", "rejected", "withdrawn"]
+APPLICATION_SOURCES  = ["naukri", "linkedin", "indeed", "referral", "direct", "other"]
+WORK_MODES           = ["remote", "hybrid", "on_site"]
+ROUND_TYPES          = ["hr_screening", "technical", "managerial", "hr_final", "salary_discussion", "assignment", "other"]
+ROUND_MODES          = ["phone", "video", "in_person"]
+ROUND_RESULTS        = ["waiting", "cleared", "not_cleared", "cancelled"]
+
+
+class Application(db.Model):
+    __tablename__ = "applications"
+    id            = db.Column(db.Integer, primary_key=True)
+    company       = db.Column(db.String(200), nullable=False)
+    role          = db.Column(db.String(200), nullable=False)
+    source        = db.Column(db.String(30),  default="naukri")
+    applied_date  = db.Column(db.Date, default=date.today)
+    status        = db.Column(db.String(30),  default="applied")
+    current_ctc   = db.Column(db.Float)
+    expected_ctc  = db.Column(db.Float)
+    offered_ctc   = db.Column(db.Float)
+    notice_period = db.Column(db.Integer)          # days
+    joining_date  = db.Column(db.Date)
+    work_mode     = db.Column(db.String(20))
+    city          = db.Column(db.String(100))
+    hr_name       = db.Column(db.String(120))
+    hr_contact    = db.Column(db.String(120))
+    notes         = db.Column(db.Text)
+    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at    = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    rounds    = db.relationship("InterviewRound", backref="application", lazy=True,
+                                cascade="all, delete-orphan",
+                                order_by="InterviewRound.scheduled_at.asc()")
+    documents = db.relationship("AppDocument", backref="application", lazy=True,
+                                cascade="all, delete-orphan",
+                                order_by="AppDocument.created_at.asc()")
+
+    @property
+    def next_round(self):
+        now = datetime.utcnow()
+        upcoming = [r for r in self.rounds
+                    if r.scheduled_at and r.scheduled_at > now and r.result == "waiting"]
+        return upcoming[0] if upcoming else None
+
+    @property
+    def rounds_cleared(self):
+        return sum(1 for r in self.rounds if r.result == "cleared")
+
+    @property
+    def docs_done(self):
+        return sum(1 for d in self.documents if d.done)
+
+    @property
+    def days_since_applied(self):
+        if self.applied_date:
+            return (date.today() - self.applied_date).days
+        return 0
+
+
+class InterviewRound(db.Model):
+    __tablename__     = "interview_rounds"
+    id                = db.Column(db.Integer, primary_key=True)
+    application_id    = db.Column(db.Integer, db.ForeignKey("applications.id"), nullable=False)
+    round_number      = db.Column(db.Integer, default=1)
+    round_type        = db.Column(db.String(30), default="hr_screening")
+    scheduled_at      = db.Column(db.DateTime)
+    interviewer       = db.Column(db.String(120))
+    mode              = db.Column(db.String(20), default="video")
+    meeting_link      = db.Column(db.String(500))
+    location          = db.Column(db.String(300))
+    result            = db.Column(db.String(20), default="waiting")
+    feedback          = db.Column(db.Text)
+    calendar_event_id = db.Column(db.Integer, db.ForeignKey("calendar_events.id"), nullable=True)
+    created_at        = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class AppDocument(db.Model):
+    __tablename__  = "app_documents"
+    id             = db.Column(db.Integer, primary_key=True)
+    application_id = db.Column(db.Integer, db.ForeignKey("applications.id"), nullable=False)
+    title          = db.Column(db.String(200), nullable=False)
+    done           = db.Column(db.Boolean, default=False)
+    created_at     = db.Column(db.DateTime, default=datetime.utcnow)

@@ -503,6 +503,112 @@ label, .form-label { font-size: 12px; font-weight: 600; color: var(--text-sub); 
   .cal-day { min-height: 64px; }
 }
 
+/* ── Interview Tracker ────────────────────────────────────── */
+
+/* Application kanban card */
+.app-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px; cursor: grab; transition: .15s; color: var(--text); }
+.app-card:hover { border-color: var(--primary); box-shadow: 0 0 0 2px #eff6ff; }
+[data-theme="dark"] .app-card:hover { box-shadow: 0 0 0 2px #1e3a5f; }
+.app-company { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+.app-role { font-size: 12px; color: var(--text-sub); margin-bottom: 6px; }
+.app-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; align-items: center; }
+.app-city { font-size: 10px; color: var(--text-sub); }
+.app-ctc { font-size: 13px; font-weight: 700; color: var(--green); margin-bottom: 4px; }
+.app-ctc-exp { color: var(--primary); }
+.app-next-round { font-size: 11px; color: var(--yellow); background: #fef3c720; border-radius: 4px; padding: 2px 6px; margin-bottom: 4px; }
+[data-theme="dark"] .app-next-round { background: #3d2a0040; }
+.app-card-footer { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-sub); margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+
+/* Source badges */
+.app-source-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 10px; text-transform: capitalize; }
+.src-naukri   { background: #fff3e0; color: #e65100; }
+.src-linkedin { background: #e3f2fd; color: #0d47a1; }
+.src-indeed   { background: #f3e5f5; color: #6a1b9a; }
+.src-referral { background: #e8f5e9; color: #1b5e20; }
+.src-direct   { background: #f1f5f9; color: #475569; }
+.src-other    { background: #f1f5f9; color: #64748b; }
+[data-theme="dark"] .src-naukri   { background: #431407; color: #fb923c; }
+[data-theme="dark"] .src-linkedin { background: #1e3a5f; color: #93c5fd; }
+[data-theme="dark"] .src-indeed   { background: #3b0764; color: #d8b4fe; }
+[data-theme="dark"] .src-referral { background: #064e3b; color: #6ee7b7; }
+[data-theme="dark"] .src-direct, [data-theme="dark"] .src-other { background: #1e293b; color: #94a3b8; }
+
+/* Work mode badge */
+.app-mode-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 10px; background: #f1f5f9; color: #475569; text-transform: capitalize; }
+[data-theme="dark"] .app-mode-badge { background: #1e293b; color: #94a3b8; }
+
+/* Application status tags */
+.app-status-tag { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: capitalize; }
+.app-st-applied        { background: #dbeafe; color: #1e40af; }
+.app-st-shortlisted    { background: #e0f2fe; color: #075985; }
+.app-st-in_progress    { background: #fef3c7; color: #92400e; }
+.app-st-offer_received { background: #d1fae5; color: #065f46; }
+.app-st-accepted       { background: #064e3b; color: #6ee7b7; }
+.app-st-rejected       { background: #fee2e2; color: #991b1b; }
+.app-st-withdrawn      { background: #f1f5f9; color: #475569; }
+[data-theme="dark"] .app-st-applied        { background: #1e3a5f; color: #93c5fd; }
+[data-theme="dark"] .app-st-shortlisted    { background: #0c3a4a; color: #7dd3fc; }
+[data-theme="dark"] .app-st-in_progress    { background: #3d2a00; color: #fde68a; }
+[data-theme="dark"] .app-st-offer_received { background: #064e3b; color: #6ee7b7; }
+[data-theme="dark"] .app-st-accepted       { background: #064e3b; color: #a7f3d0; }
+[data-theme="dark"] .app-st-rejected       { background: #450a0a; color: #fca5a5; }
+[data-theme="dark"] .app-st-withdrawn      { background: #1e293b; color: #94a3b8; }
+
+/* Kanban column header colors */
+.int-header-applied        { background: #dbeafe; }
+.int-header-shortlisted    { background: #e0f2fe; }
+.int-header-in_progress    { background: #fef3c7; }
+.int-header-offer_received { background: #d1fae5; }
+.int-header-accepted       { background: #bbf7d0; }
+.int-header-rejected       { background: #fee2e2; }
+.int-header-withdrawn      { background: #f1f5f9; }
+[data-theme="dark"] .int-header-applied        { background: #1e3a5f; }
+[data-theme="dark"] .int-header-shortlisted    { background: #0c3a4a; }
+[data-theme="dark"] .int-header-in_progress    { background: #3d2a00; }
+[data-theme="dark"] .int-header-offer_received { background: #064e3b; }
+[data-theme="dark"] .int-header-accepted       { background: #064e3b; }
+[data-theme="dark"] .int-header-rejected       { background: #450a0a; }
+[data-theme="dark"] .int-header-withdrawn      { background: #1e293b; }
+
+/* Round cards */
+.round-list { display: flex; flex-direction: column; gap: 12px; }
+.round-card { border: 1px solid var(--border); border-left-width: 4px; border-radius: 6px; padding: 14px 16px; }
+.rr-border-waiting     { border-left-color: var(--yellow); }
+.rr-border-cleared     { border-left-color: var(--green); }
+.rr-border-not_cleared { border-left-color: var(--red); }
+.rr-border-cancelled   { border-left-color: var(--border); }
+
+.round-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.round-num { background: var(--border); color: var(--text); font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+.round-type-tag { font-size: 12px; font-weight: 600; color: var(--text); }
+.round-result-badge { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 10px; }
+.rr-waiting  { background: #fef3c7; color: #92400e; }
+.rr-cleared  { background: #d1fae5; color: #065f46; }
+.rr-fail     { background: #fee2e2; color: #991b1b; }
+.rr-cancel   { background: #f1f5f9; color: #475569; }
+[data-theme="dark"] .rr-waiting { background: #3d2a00; color: #fde68a; }
+[data-theme="dark"] .rr-cleared { background: #064e3b; color: #6ee7b7; }
+[data-theme="dark"] .rr-fail    { background: #450a0a; color: #fca5a5; }
+[data-theme="dark"] .rr-cancel  { background: #1e293b; color: #94a3b8; }
+
+.round-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--text-sub); margin-bottom: 6px; }
+.round-feedback { font-size: 12px; color: var(--text-sub); background: var(--bg); border-radius: 4px; padding: 8px; margin-top: 6px; white-space: pre-wrap; }
+
+.round-update-details { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+.round-update-toggle { font-size: 12px; color: var(--primary); cursor: pointer; list-style: none; font-weight: 600; }
+.round-update-toggle::-webkit-details-marker { display: none; }
+
+/* CTC detail rows */
+.ctc-row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; }
+.ctc-label { color: var(--text-sub); font-size: 12px; }
+.ctc-val { font-weight: 600; }
+.hike-pos { color: var(--green); font-weight: 700; }
+.hike-neg { color: var(--red); font-weight: 700; }
+
+/* Offer comparison table */
+.offer-table .ctc-cell { font-weight: 600; }
+.offer-table .offer-ctc { color: var(--green); font-size: 14px; }
+
 /* ── Misc ─────────────────────────────────────────────────── */
 .empty-state { color: var(--text-sub); font-size: 13px; padding: 16px 0; text-align: center; }
 small { font-size: 11px; color: var(--text-sub); }

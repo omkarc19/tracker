@@ -12,7 +12,10 @@ import scheduler
 from models import (db, Client, Deal, Activity, STAGES, ACTIVITY_TYPES,
                     Task, TaskComment, TaskSubtask, TaskActivity,
                     TASK_STATUSES, TASK_PRIORITIES, TASK_LABELS, RECUR_INTERVALS,
-                    DEAL_LABELS, CalendarEvent, EVENT_TYPES, TeamMember)
+                    DEAL_LABELS, CalendarEvent, EVENT_TYPES, TeamMember,
+                    Application, InterviewRound, AppDocument,
+                    APPLICATION_STATUSES, APPLICATION_SOURCES, WORK_MODES,
+                    ROUND_TYPES, ROUND_MODES, ROUND_RESULTS)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -930,6 +933,274 @@ def delete_team_member(member_id):
 def api_team_members():
     members = TeamMember.query.filter_by(active=True).order_by(TeamMember.name).all()
     return jsonify([{"id": m.id, "name": m.name, "role": m.role or ""} for m in members])
+
+
+# ── Interviews ────────────────────────────────────────────────────────────────
+
+def _parse_float(val):
+    try:
+        return float(val) if val and val.strip() else None
+    except ValueError:
+        return None
+
+def _parse_int(val):
+    try:
+        return int(val) if val and val.strip() else None
+    except ValueError:
+        return None
+
+def _parse_date(val):
+    try:
+        return date.fromisoformat(val) if val and val.strip() else None
+    except ValueError:
+        return None
+
+
+@app.route("/interviews")
+def interviews():
+    source_filter = request.args.get("source", "")
+    mode_filter   = request.args.get("mode", "")
+    apps_by_status = {}
+    total = 0
+    for status in APPLICATION_STATUSES:
+        q = Application.query.filter_by(status=status)
+        if source_filter:
+            q = q.filter_by(source=source_filter)
+        if mode_filter:
+            q = q.filter_by(work_mode=mode_filter)
+        items = q.order_by(Application.updated_at.desc()).all()
+        apps_by_status[status] = items
+        total += len(items)
+    return render_template(
+        "interviews.html",
+        apps_by_status=apps_by_status,
+        statuses=APPLICATION_STATUSES,
+        sources=APPLICATION_SOURCES,
+        work_modes=WORK_MODES,
+        source_filter=source_filter,
+        mode_filter=mode_filter,
+        total=total,
+    )
+
+
+@app.route("/interviews/offers")
+def interview_offers():
+    apps = (Application.query
+            .filter(Application.status.in_(["offer_received", "accepted"]))
+            .order_by(Application.offered_ctc.desc().nullslast())
+            .all())
+    return render_template("interview_offers.html", apps=apps)
+
+
+@app.route("/interviews/new", methods=["GET", "POST"])
+def new_interview():
+    if request.method == "POST":
+        app_obj = Application(
+            company       = request.form["company"].strip(),
+            role          = request.form["role"].strip(),
+            source        = request.form.get("source", "naukri"),
+            applied_date  = _parse_date(request.form.get("applied_date")) or date.today(),
+            status        = request.form.get("status", "applied"),
+            current_ctc   = _parse_float(request.form.get("current_ctc")),
+            expected_ctc  = _parse_float(request.form.get("expected_ctc")),
+            offered_ctc   = _parse_float(request.form.get("offered_ctc")),
+            notice_period = _parse_int(request.form.get("notice_period")),
+            joining_date  = _parse_date(request.form.get("joining_date")),
+            work_mode     = request.form.get("work_mode", ""),
+            city          = request.form.get("city", "").strip() or None,
+            hr_name       = request.form.get("hr_name", "").strip() or None,
+            hr_contact    = request.form.get("hr_contact", "").strip() or None,
+            notes         = request.form.get("notes", "").strip() or None,
+        )
+        db.session.add(app_obj)
+        db.session.commit()
+        flash(f"Application for {app_obj.company} added.", "success")
+        return redirect(url_for("interview_detail", app_id=app_obj.id))
+    return render_template(
+        "new_interview.html",
+        statuses=APPLICATION_STATUSES,
+        sources=APPLICATION_SOURCES,
+        work_modes=WORK_MODES,
+        today=date.today().isoformat(),
+    )
+
+
+@app.route("/interviews/<int:app_id>")
+def interview_detail(app_id):
+    app_obj = Application.query.get_or_404(app_id)
+    return render_template(
+        "interview_detail.html",
+        app=app_obj,
+        statuses=APPLICATION_STATUSES,
+        round_types=ROUND_TYPES,
+        round_modes=ROUND_MODES,
+        round_results=ROUND_RESULTS,
+    )
+
+
+@app.route("/interviews/<int:app_id>/edit", methods=["GET", "POST"])
+def edit_interview(app_id):
+    app_obj = Application.query.get_or_404(app_id)
+    if request.method == "POST":
+        app_obj.company       = request.form["company"].strip()
+        app_obj.role          = request.form["role"].strip()
+        app_obj.source        = request.form.get("source", "naukri")
+        app_obj.applied_date  = _parse_date(request.form.get("applied_date")) or app_obj.applied_date
+        app_obj.status        = request.form.get("status", "applied")
+        app_obj.current_ctc   = _parse_float(request.form.get("current_ctc"))
+        app_obj.expected_ctc  = _parse_float(request.form.get("expected_ctc"))
+        app_obj.offered_ctc   = _parse_float(request.form.get("offered_ctc"))
+        app_obj.notice_period = _parse_int(request.form.get("notice_period"))
+        app_obj.joining_date  = _parse_date(request.form.get("joining_date"))
+        app_obj.work_mode     = request.form.get("work_mode", "")
+        app_obj.city          = request.form.get("city", "").strip() or None
+        app_obj.hr_name       = request.form.get("hr_name", "").strip() or None
+        app_obj.hr_contact    = request.form.get("hr_contact", "").strip() or None
+        app_obj.notes         = request.form.get("notes", "").strip() or None
+        app_obj.updated_at    = datetime.utcnow()
+        db.session.commit()
+        flash("Application updated.", "success")
+        return redirect(url_for("interview_detail", app_id=app_id))
+    return render_template(
+        "edit_interview.html",
+        app=app_obj,
+        statuses=APPLICATION_STATUSES,
+        sources=APPLICATION_SOURCES,
+        work_modes=WORK_MODES,
+    )
+
+
+@app.route("/interviews/<int:app_id>/delete", methods=["POST"])
+def delete_interview(app_id):
+    app_obj = Application.query.get_or_404(app_id)
+    company = app_obj.company
+    db.session.delete(app_obj)
+    db.session.commit()
+    flash(f"Application for {company} deleted.", "info")
+    return redirect(url_for("interviews"))
+
+
+@app.route("/api/interviews/<int:app_id>/status", methods=["POST"])
+def api_interview_status(app_id):
+    app_obj = Application.query.get_or_404(app_id)
+    data = request.get_json()
+    new_status = data.get("status")
+    if new_status not in APPLICATION_STATUSES:
+        return jsonify({"error": "invalid status"}), 400
+    app_obj.status     = new_status
+    app_obj.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/interviews/<int:app_id>/round/add", methods=["POST"])
+def add_interview_round(app_id):
+    app_obj = Application.query.get_or_404(app_id)
+    sched_raw = request.form.get("scheduled_at", "").strip()
+    scheduled_at = None
+    if sched_raw:
+        try:
+            scheduled_at = datetime.strptime(sched_raw, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            pass
+
+    round_num = len(app_obj.rounds) + 1
+    rnd = InterviewRound(
+        application_id = app_id,
+        round_number   = round_num,
+        round_type     = request.form.get("round_type", "hr_screening"),
+        scheduled_at   = scheduled_at,
+        interviewer    = request.form.get("interviewer", "").strip() or None,
+        mode           = request.form.get("mode", "video"),
+        meeting_link   = request.form.get("meeting_link", "").strip() or None,
+        location       = request.form.get("location", "").strip() or None,
+        result         = "waiting",
+    )
+    db.session.add(rnd)
+    db.session.flush()
+
+    # Auto-create calendar event
+    if scheduled_at:
+        label = rnd.round_type.replace("_", " ").title()
+        cal = CalendarEvent(
+            title        = f"Interview: {app_obj.company} – {label}",
+            date         = scheduled_at.date(),
+            start_time   = scheduled_at.strftime("%H:%M"),
+            event_type   = "meeting",
+            location     = rnd.location,
+            meeting_link = rnd.meeting_link,
+            attendees    = rnd.interviewer or "",
+            notes        = f"Round {round_num} · {app_obj.role}",
+            created_by   = "system",
+        )
+        db.session.add(cal)
+        db.session.flush()
+        rnd.calendar_event_id = cal.id
+
+    # Move application to in_progress if still at applied/shortlisted
+    if app_obj.status in ("applied", "shortlisted"):
+        app_obj.status = "in_progress"
+
+    db.session.commit()
+    flash("Interview round added.", "success")
+    return redirect(url_for("interview_detail", app_id=app_id))
+
+
+@app.route("/interviews/round/<int:round_id>/update", methods=["POST"])
+def update_interview_round(round_id):
+    rnd = InterviewRound.query.get_or_404(round_id)
+    rnd.result   = request.form.get("result", rnd.result)
+    rnd.feedback = request.form.get("feedback", "").strip() or None
+    sched_raw = request.form.get("scheduled_at", "").strip()
+    if sched_raw:
+        try:
+            rnd.scheduled_at = datetime.strptime(sched_raw, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            pass
+    db.session.commit()
+    flash("Round updated.", "success")
+    return redirect(url_for("interview_detail", app_id=rnd.application_id))
+
+
+@app.route("/interviews/round/<int:round_id>/delete", methods=["POST"])
+def delete_interview_round(round_id):
+    rnd = InterviewRound.query.get_or_404(round_id)
+    app_id = rnd.application_id
+    if rnd.calendar_event_id:
+        cal = CalendarEvent.query.get(rnd.calendar_event_id)
+        if cal:
+            db.session.delete(cal)
+    db.session.delete(rnd)
+    db.session.commit()
+    flash("Round removed.", "info")
+    return redirect(url_for("interview_detail", app_id=app_id))
+
+
+@app.route("/interviews/<int:app_id>/doc/add", methods=["POST"])
+def add_app_doc(app_id):
+    Application.query.get_or_404(app_id)
+    title = request.form.get("title", "").strip()
+    if title:
+        db.session.add(AppDocument(application_id=app_id, title=title))
+        db.session.commit()
+    return redirect(url_for("interview_detail", app_id=app_id))
+
+
+@app.route("/interviews/doc/<int:doc_id>/toggle", methods=["POST"])
+def toggle_app_doc(doc_id):
+    doc = AppDocument.query.get_or_404(doc_id)
+    doc.done = not doc.done
+    db.session.commit()
+    return redirect(url_for("interview_detail", app_id=doc.application_id))
+
+
+@app.route("/interviews/doc/<int:doc_id>/delete", methods=["POST"])
+def delete_app_doc(doc_id):
+    doc = AppDocument.query.get_or_404(doc_id)
+    app_id = doc.application_id
+    db.session.delete(doc)
+    db.session.commit()
+    return redirect(url_for("interview_detail", app_id=app_id))
 
 
 if __name__ == "__main__":

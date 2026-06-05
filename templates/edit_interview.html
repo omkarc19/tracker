@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Edit Application — Interviews{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('interview_detail', app_id=app.id) }}" class="back-link">← {{ app.company }}</a>
+    <h1>Edit Application</h1>
+  </div>
+</div>
+
+<div class="form-card" style="max-width:680px">
+  <form method="POST">
+
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label class="form-label">Company *</label>
+        <input type="text" name="company" class="form-input" required value="{{ app.company }}">
+      </div>
+      <div class="form-group" style="flex:2">
+        <label class="form-label">Role / Position *</label>
+        <input type="text" name="role" class="form-input" required value="{{ app.role }}">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Source</label>
+        <select name="source" class="form-input">
+          {% for s in sources %}
+          <option value="{{ s }}" {% if app.source == s %}selected{% endif %}>{{ s.title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Applied Date</label>
+        <input type="date" name="applied_date" class="form-input"
+               value="{{ app.applied_date.isoformat() if app.applied_date else '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select name="status" class="form-input">
+          {% for s in statuses %}
+          <option value="{{ s }}" {% if app.status == s %}selected{% endif %}>{{ s.replace("_"," ").title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <h4 style="font-size:13px;font-weight:600;color:var(--text-sub);margin-bottom:10px">CTC Details (LPA)</h4>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Current CTC</label>
+        <input type="number" name="current_ctc" class="form-input" step="0.1"
+               value="{{ app.current_ctc or '' }}" placeholder="e.g. 8.5">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Expected CTC</label>
+        <input type="number" name="expected_ctc" class="form-input" step="0.1"
+               value="{{ app.expected_ctc or '' }}" placeholder="e.g. 14">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Offered CTC</label>
+        <input type="number" name="offered_ctc" class="form-input" step="0.1"
+               value="{{ app.offered_ctc or '' }}" placeholder="fill when offered">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Work Mode</label>
+        <select name="work_mode" class="form-input">
+          <option value="">— Select —</option>
+          {% for m in work_modes %}
+          <option value="{{ m }}" {% if app.work_mode == m %}selected{% endif %}>{{ m.replace("_"," ").title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">City / Location</label>
+        <input type="text" name="city" class="form-input" value="{{ app.city or '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notice Period (days)</label>
+        <input type="number" name="notice_period" class="form-input" value="{{ app.notice_period or '' }}">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Expected Joining Date</label>
+        <input type="date" name="joining_date" class="form-input"
+               value="{{ app.joining_date.isoformat() if app.joining_date else '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">HR Name</label>
+        <input type="text" name="hr_name" class="form-input" value="{{ app.hr_name or '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">HR Contact</label>
+        <input type="text" name="hr_contact" class="form-input" value="{{ app.hr_contact or '' }}">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <textarea name="notes" class="form-input" rows="3">{{ app.notes or '' }}</textarea>
+    </div>
+
+    <div class="form-actions">
+      <a href="{{ url_for('interview_detail', app_id=app.id) }}" class="btn btn-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary">Save Changes</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

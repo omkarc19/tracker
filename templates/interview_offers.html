@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Offer Comparison — Interviews{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('interviews') }}" class="back-link">← Interview Tracker</a>
+    <h1>Offer Comparison</h1>
+    <span class="subtitle">{{ apps|length }} offer{{ "s" if apps|length != 1 }} in hand</span>
+  </div>
+</div>
+
+{% if apps %}
+<div class="card" style="padding:0;overflow:auto">
+  <table class="data-table offer-table">
+    <thead>
+      <tr>
+        <th>Company</th>
+        <th>Role</th>
+        <th>Current CTC</th>
+        <th>Expected CTC</th>
+        <th>Offered CTC</th>
+        <th>Hike</th>
+        <th>Work Mode</th>
+        <th>Location</th>
+        <th>Joining</th>
+        <th>Notice</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in apps %}
+      {% set hike = ((a.offered_ctc - a.current_ctc) / a.current_ctc * 100)|round(1)
+                   if (a.offered_ctc and a.current_ctc and a.current_ctc > 0) else None %}
+      <tr onclick="window.location='{{ url_for('interview_detail', app_id=a.id) }}'" style="cursor:pointer">
+        <td><strong>{{ a.company }}</strong></td>
+        <td>{{ a.role }}</td>
+        <td class="ctc-cell">{{ "₹%.1f"|format(a.current_ctc) if a.current_ctc else "—" }}</td>
+        <td class="ctc-cell">{{ "₹%.1f"|format(a.expected_ctc) if a.expected_ctc else "—" }}</td>
+        <td class="ctc-cell offer-ctc">{{ "₹%.1f"|format(a.offered_ctc) if a.offered_ctc else "—" }}</td>
+        <td>
+          {% if hike is not none %}
+            <span class="{% if hike >= 0 %}hike-pos{% else %}hike-neg{% endif %}">
+              {{ "+" if hike >= 0 }}{{ hike }}%
+            </span>
+          {% else %}—{% endif %}
+        </td>
+        <td>{{ a.work_mode.replace("_"," ").title() if a.work_mode else "—" }}</td>
+        <td>{{ a.city or "—" }}</td>
+        <td>{{ a.joining_date.strftime("%d %b %Y") if a.joining_date else "—" }}</td>
+        <td>{{ (a.notice_period|string + "d") if a.notice_period else "—" }}</td>
+        <td><span class="app-status-tag app-st-{{ a.status }}">{{ a.status.replace("_"," ").title() }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Quick summary cards -->
+{% if apps|length > 1 %}
+<div class="metrics-row" style="margin-top:20px">
+  {% set best = apps|sort(attribute='offered_ctc', reverse=True)|first if apps|selectattr('offered_ctc')|list else None %}
+  {% set earliest = apps|sort(attribute='joining_date')|first if apps|selectattr('joining_date')|list else None %}
+  {% if best and best.offered_ctc %}
+  <div class="metric-card">
+    <div class="metric-label">Highest Offer</div>
+    <div class="metric-value" style="color:var(--green)">₹{{ "%.1f"|format(best.offered_ctc) }} LPA</div>
+    <div class="metric-sub">{{ best.company }}</div>
+  </div>
+  {% endif %}
+  {% if earliest and earliest.joining_date %}
+  <div class="metric-card">
+    <div class="metric-label">Earliest Joining</div>
+    <div class="metric-value" style="font-size:18px">{{ earliest.joining_date.strftime("%d %b") }}</div>
+    <div class="metric-sub">{{ earliest.company }}</div>
+  </div>
+  {% endif %}
+  <div class="metric-card">
+    <div class="metric-label">Accepted</div>
+    <div class="metric-value">{{ apps|selectattr('status','eq','accepted')|list|length }}</div>
+    <div class="metric-sub">of {{ apps|length }} offers</div>
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+  <div class="card">
+    <p class="empty-state" style="padding:40px">
+      No offers yet. Applications with status "Offer Received" or "Accepted" will appear here.
+    </p>
+  </div>
+{% endif %}
+{% endblock %}
