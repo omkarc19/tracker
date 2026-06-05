@@ -35,7 +35,15 @@
       </div>
       <div class="form-group">
         <label>Edited by</label>
-        <input type="text" name="edited_by" class="input-text" placeholder="Your name" />
+        <select id="sel-editedby" class="input-select team-person-select"
+                onchange="handlePersonSelect(this,'txt-editedby','hid-editedby')">
+          <option value="">— Select member —</option>
+          <option value="__other__">Other (type name)…</option>
+        </select>
+        <input type="text" id="txt-editedby" class="input-text"
+               placeholder="Type name…" style="display:none;margin-top:6px"
+               oninput="document.getElementById('hid-editedby').value=this.value">
+        <input type="hidden" name="edited_by" id="hid-editedby">
       </div>
     </div>
     <div class="form-group">
@@ -60,7 +68,15 @@
     <div class="form-row">
       <div class="form-group">
         <label>Assigned To</label>
-        <input type="text" name="assigned_to" class="input-text" value="{{ task.assigned_to or '' }}" />
+        <select id="sel-assigned-edit" class="input-select team-person-select"
+                onchange="handlePersonSelect(this,'txt-assigned-edit','hid-assigned-edit')">
+          <option value="">— Select member —</option>
+          <option value="__other__">Other (type name)…</option>
+        </select>
+        <input type="text" id="txt-assigned-edit" class="input-text"
+               placeholder="Type name…" style="display:none;margin-top:6px"
+               oninput="document.getElementById('hid-assigned-edit').value=this.value">
+        <input type="hidden" name="assigned_to" id="hid-assigned-edit" value="{{ task.assigned_to or '' }}">
       </div>
       <div class="form-group">
         <label>Linked Deal</label>
@@ -177,7 +193,7 @@
 
     <!-- Subtasks -->
     <div class="card">
-      <h3>Checklist
+      <h3>Sub Tasks
         {% if task.subtasks %}
           <span class="badge">{{ task.subtasks_done }}/{{ task.subtasks|length }}</span>
         {% endif %}
@@ -203,7 +219,7 @@
         {% endfor %}
       {% endif %}
       <form method="POST" action="{{ url_for('add_subtask', task_id=task.id) }}" class="subtask-form">
-        <input type="text" name="title" class="input-text" placeholder="Add checklist item..." required />
+        <input type="text" name="title" class="input-text" placeholder="New sub task…" required />
         <button type="submit" class="btn btn-secondary">Add</button>
       </form>
     </div>
@@ -237,7 +253,15 @@
         <div class="form-row">
           <div class="form-group">
             <label>Your name</label>
-            <input type="text" name="author" class="input-text" placeholder="Name" required />
+            <select id="sel-comment-author" class="input-select team-person-select"
+                    onchange="handlePersonSelect(this,'txt-comment-author','hid-comment-author')">
+              <option value="">— Select member —</option>
+              <option value="__other__">Other (type name)…</option>
+            </select>
+            <input type="text" id="txt-comment-author" class="input-text"
+                   placeholder="Type name…" style="display:none;margin-top:6px"
+                   oninput="document.getElementById('hid-comment-author').value=this.value">
+            <input type="hidden" name="author" id="hid-comment-author" required>
           </div>
         </div>
         <div class="form-group">
@@ -287,5 +311,50 @@ async function moveTaskStatus(taskId, newStatus) {
     if (res.ok) window.location.reload();
   } catch {}
 }
+
+function handlePersonSelect(sel, txtId, hidId) {
+  const txt = document.getElementById(txtId);
+  const hid = document.getElementById(hidId);
+  if (sel.value === '__other__') {
+    txt.style.display = 'block';
+    txt.value = '';
+    hid.value = '';
+    txt.focus();
+  } else {
+    txt.style.display = 'none';
+    hid.value = sel.value;
+  }
+}
+
+async function loadTeamPersonSelects() {
+  const resp = await fetch('/api/team/members');
+  const members = await resp.json();
+  document.querySelectorAll('.team-person-select').forEach(sel => {
+    const otherOpt = sel.querySelector('[value="__other__"]');
+    members.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.name;
+      opt.textContent = m.name + (m.role ? ` (${m.role})` : '');
+      sel.insertBefore(opt, otherOpt);
+    });
+  });
+
+  // Pre-select current assigned_to in the edit panel
+  const currentAssigned = document.getElementById('hid-assigned-edit').value;
+  if (currentAssigned) {
+    const sel = document.getElementById('sel-assigned-edit');
+    const match = [...sel.options].find(o => o.value === currentAssigned);
+    if (match) {
+      sel.value = currentAssigned;
+    } else {
+      sel.value = '__other__';
+      const txt = document.getElementById('txt-assigned-edit');
+      txt.style.display = 'block';
+      txt.value = currentAssigned;
+    }
+  }
+}
+
+loadTeamPersonSelects();
 </script>
 {% endblock %}

@@ -37,11 +37,27 @@
       <div class="form-row">
         <div class="form-group">
           <label>Assigned To</label>
-          <input type="text" name="assigned_to" class="input-text" placeholder="Team member name" />
+          <select id="sel-assigned" class="input-select team-person-select"
+                  onchange="handlePersonSelect(this,'txt-assigned','hid-assigned')">
+            <option value="">— Select member —</option>
+            <option value="__other__">Other (type name)…</option>
+          </select>
+          <input type="text" id="txt-assigned" class="input-text"
+                 placeholder="Type name…" style="display:none;margin-top:6px"
+                 oninput="document.getElementById('hid-assigned').value=this.value">
+          <input type="hidden" name="assigned_to" id="hid-assigned">
         </div>
         <div class="form-group">
           <label>Created By</label>
-          <input type="text" name="created_by" class="input-text" placeholder="Your name" />
+          <select id="sel-created" class="input-select team-person-select"
+                  onchange="handlePersonSelect(this,'txt-created','hid-created')">
+            <option value="">— Select member —</option>
+            <option value="__other__">Other (type name)…</option>
+          </select>
+          <input type="text" id="txt-created" class="input-text"
+                 placeholder="Type name…" style="display:none;margin-top:6px"
+                 oninput="document.getElementById('hid-created').value=this.value">
+          <input type="hidden" name="created_by" id="hid-created">
         </div>
       </div>
     </div>
@@ -96,4 +112,36 @@
 
   </form>
 </div>
+
+<script>
+function handlePersonSelect(sel, txtId, hidId) {
+  const txt = document.getElementById(txtId);
+  const hid = document.getElementById(hidId);
+  if (sel.value === '__other__') {
+    txt.style.display = 'block';
+    txt.value = '';
+    hid.value = '';
+    txt.focus();
+  } else {
+    txt.style.display = 'none';
+    hid.value = sel.value;
+  }
+}
+
+async function loadTeamPersonSelects() {
+  const resp = await fetch('/api/team/members');
+  const members = await resp.json();
+  document.querySelectorAll('.team-person-select').forEach(sel => {
+    const otherOpt = sel.querySelector('[value="__other__"]');
+    members.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.name;
+      opt.textContent = m.name + (m.role ? ` (${m.role})` : '');
+      sel.insertBefore(opt, otherOpt);
+    });
+  });
+}
+
+loadTeamPersonSelects();
+</script>
 {% endblock %}
