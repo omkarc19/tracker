@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 import base64
 import csv
 import io
@@ -936,21 +936,26 @@ def sync_gcal():
         description = str(component.get("DESCRIPTION", "") or "")
         location_val = str(component.get("LOCATION", "") or "")
 
-        # Date + time
+        # Date + time — convert UTC to IST (UTC+5:30)
+        IST = timezone(timedelta(hours=5, minutes=30))
         dtstart = component.get("DTSTART")
         dtend   = component.get("DTEND")
         ev_date = ev_start = ev_end = None
         if dtstart:
             dt = dtstart.dt
             if hasattr(dt, "date"):
+                if dt.tzinfo is not None:
+                    dt = dt.astimezone(IST)
                 ev_date  = dt.date()
                 ev_start = dt.strftime("%H:%M")
             else:
                 ev_date = dt
         if dtend:
             dt = dtend.dt
-            if hasattr(dt, "strftime"):
-                ev_end = dt.strftime("%H:%M") if hasattr(dt, "hour") else None
+            if hasattr(dt, "hour"):
+                if dt.tzinfo is not None:
+                    dt = dt.astimezone(IST)
+                ev_end = dt.strftime("%H:%M")
 
         if not ev_date:
             continue
