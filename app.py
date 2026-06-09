@@ -906,10 +906,17 @@ def sync_gcal():
     if not setting or not setting.value:
         return jsonify({"error": "No ICS URL configured"}), 400
     try:
-        resp = http_requests.get(setting.value, timeout=15)
+        resp = http_requests.get(
+            setting.value,
+            timeout=15,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; CalendarSync/1.0)"},
+        )
         resp.raise_for_status()
     except Exception as e:
         return jsonify({"error": f"Fetch failed: {e}"}), 502
+
+    if "text/html" in resp.headers.get("Content-Type", ""):
+        return jsonify({"error": "URL returned HTML — calendar may not be public. Use the Secret address in iCal format instead."}), 400
 
     try:
         cal = iCalendar.from_ical(resp.content)
