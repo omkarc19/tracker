@@ -972,15 +972,31 @@ def sync_gcal():
             if "meet.google.com" in url_field:
                 meet_url = url_field
 
-        # Attendees
+        # Attendees — Google public ICS only exports the owner as ATTENDEE,
+        # so pull ORGANIZER (the person who created/invited) as the guest.
+        calendar_owner = "soubhik.das@swiftscalesoftware.com"
         raw_attendees = component.get("ATTENDEE", [])
         if not isinstance(raw_attendees, list):
-            raw_attendees = [raw_attendees]
+            raw_attendees = [raw_attendees] if raw_attendees else []
         attendee_names = []
         for a in raw_attendees:
-            cn = a.params.get("CN", "") if hasattr(a, "params") else ""
-            if cn:
-                attendee_names.append(cn)
+            cn  = a.params.get("CN", "") if hasattr(a, "params") else ""
+            email = str(a).replace("mailto:", "").strip()
+            name  = cn if cn and cn != email else email
+            if name and name != calendar_owner:
+                attendee_names.append(name)
+
+        # Add organizer if it's a real person (not a calendar group ID)
+        organizer = component.get("ORGANIZER")
+        if organizer:
+            org_cn    = organizer.params.get("CN", "") if hasattr(organizer, "params") else ""
+            org_email = str(organizer).replace("mailto:", "").strip()
+            org_name  = org_cn if org_cn and org_cn != org_email else org_email
+            # Skip if it looks like an internal calendar group ID, not a person
+            if org_name and "@" in org_name and "group.calendar.google.com" not in org_name:
+                if org_name not in attendee_names and org_name != calendar_owner:
+                    attendee_names.append(org_name)
+
         attendees_str = ", ".join(attendee_names)
 
         existing = CalendarEvent.query.filter_by(external_id=uid).first()
