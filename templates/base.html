@@ -64,5 +64,9 @@
       }
     })();
   </script>
+  <script>
+    // Fire-and-forget GCal sync on every page navigation
+    fetch('/api/calendar/sync', {method:'POST'}).catch(() => {});
+  </script>
 </body>
 </html>

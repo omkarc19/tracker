@@ -5,6 +5,7 @@
 <div class="page-header">
   <h1>Team Calendar</h1>
   <div style="display:flex;gap:8px;align-items:center">
+    <button id="refresh-btn" onclick="manualRefresh()" class="btn btn-secondary" style="font-size:12px" title="Sync Google Calendar">⟳ Refresh</button>
     <button onclick="toggleGcalBar()" class="btn btn-secondary" style="font-size:12px">🔗 Google Cal</button>
     <a href="{{ url_for('new_calendar_event') }}" class="btn btn-primary">+ New Event</a>
   </div>
@@ -266,9 +267,31 @@ function renderUpcoming() {
   el.innerHTML = html;
 }
 
-// Boot
-loadMonth(currentYear, currentMonth);
+// Boot — background sync then load calendar
+backgroundSync();
 loadGcalUrl();
+
+async function backgroundSync() {
+  try {
+    await fetch('/api/calendar/sync', {method:'POST'});
+  } catch(e) { /* silent */ }
+  loadMonth(currentYear, currentMonth);
+}
+
+async function manualRefresh() {
+  const btn = document.getElementById('refresh-btn');
+  btn.textContent = '⟳ Syncing…';
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/api/calendar/sync', {method:'POST'});
+    const data = await resp.json();
+    btn.textContent = data.error ? '✗ Error' : `✓ Done`;
+    if (!data.error) loadMonth(currentYear, currentMonth);
+  } catch(e) {
+    btn.textContent = '✗ Error';
+  }
+  setTimeout(() => { btn.textContent = '⟳ Refresh'; btn.disabled = false; }, 2000);
+}
 
 // ── Google Calendar sync ──────────────────────────────────────────────────────
 function toggleGcalBar() {

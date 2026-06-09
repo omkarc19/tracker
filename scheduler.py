@@ -250,7 +250,7 @@ def sync_gcal_ics(app):
 def start(app):
     _scheduler.add_job(check_meeting_reminders, "interval", minutes=5, args=[app], id="reminders")
     _scheduler.add_job(check_task_reminders, "interval", hours=1, args=[app], id="task_reminders")
-    _scheduler.add_job(sync_gcal_ics, "interval", minutes=30, args=[app], id="gcal_sync")
+    _scheduler.add_job(sync_gcal_ics, "interval", minutes=5, args=[app], id="gcal_sync")
     _scheduler.add_job(
         send_daily_digest, "cron",
         hour=config.DAILY_DIGEST_HOUR, minute=0,
