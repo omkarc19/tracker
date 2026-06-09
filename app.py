@@ -933,6 +933,8 @@ def sync_gcal():
             continue
 
         summary = str(component.get("SUMMARY", "No Title"))
+        if summary.strip().lower() == "busy":
+            continue  # skip privacy-masked events
         description = str(component.get("DESCRIPTION", "") or "")
         location_val = str(component.get("LOCATION", "") or "")
 
