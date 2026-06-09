@@ -9,13 +9,17 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify, f
 import config
 import notifications
 import scheduler
+import re
+import requests as http_requests
+from icalendar import Calendar as iCalendar
+
 from models import (db, Client, Deal, Activity, STAGES, ACTIVITY_TYPES,
                     Task, TaskComment, TaskSubtask, TaskActivity,
                     TASK_STATUSES, TASK_PRIORITIES, TASK_LABELS, RECUR_INTERVALS,
                     DEAL_LABELS, CalendarEvent, EVENT_TYPES, TeamMember,
                     Application, InterviewRound, AppDocument,
                     APPLICATION_STATUSES, APPLICATION_SOURCES, WORK_MODES,
-                    ROUND_TYPES, ROUND_MODES, ROUND_RESULTS)
+                    ROUND_TYPES, ROUND_MODES, ROUND_RESULTS, AppSetting)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -60,6 +64,8 @@ with app.app_context():
         for sql in [
             "ALTER TABLE clients ADD COLUMN notes TEXT",
             "ALTER TABLE deals ADD COLUMN labels VARCHAR(300) DEFAULT ''",
+            "ALTER TABLE calendar_events ADD COLUMN external_id VARCHAR(500)",
+            "ALTER TABLE calendar_events ADD COLUMN gcal_synced BOOLEAN DEFAULT 0",
         ]:
             try:
                 conn.execute(db.text(sql))
@@ -875,6 +881,126 @@ def delete_calendar_event(event_id):
     db.session.commit()
     flash("Event deleted.", "info")
     return redirect(url_for("calendar_view"))
+
+
+# ── Google Calendar ICS Sync ─────────────────────────────────────────────────
+
+@app.route("/settings/gcal", methods=["GET", "POST"])
+def settings_gcal():
+    if request.method == "POST":
+        url = (request.get_json() or {}).get("url", "").strip()
+        setting = AppSetting.query.get("gcal_ics_url")
+        if setting:
+            setting.value = url
+        else:
+            db.session.add(AppSetting(key="gcal_ics_url", value=url))
+        db.session.commit()
+        return jsonify({"ok": True})
+    setting = AppSetting.query.get("gcal_ics_url")
+    return jsonify({"url": setting.value if setting else ""})
+
+
+@app.route("/api/calendar/sync", methods=["POST"])
+def sync_gcal():
+    setting = AppSetting.query.get("gcal_ics_url")
+    if not setting or not setting.value:
+        return jsonify({"error": "No ICS URL configured"}), 400
+    try:
+        resp = http_requests.get(setting.value, timeout=15)
+        resp.raise_for_status()
+    except Exception as e:
+        return jsonify({"error": f"Fetch failed: {e}"}), 502
+
+    try:
+        cal = iCalendar.from_ical(resp.content)
+    except Exception as e:
+        return jsonify({"error": f"Parse failed: {e}"}), 400
+
+    imported = updated = 0
+    for component in cal.walk():
+        if component.name != "VEVENT":
+            continue
+
+        uid = str(component.get("UID", ""))
+        if not uid:
+            continue
+
+        summary = str(component.get("SUMMARY", "No Title"))
+        description = str(component.get("DESCRIPTION", "") or "")
+        location_val = str(component.get("LOCATION", "") or "")
+
+        # Date + time
+        dtstart = component.get("DTSTART")
+        dtend   = component.get("DTEND")
+        ev_date = ev_start = ev_end = None
+        if dtstart:
+            dt = dtstart.dt
+            if hasattr(dt, "date"):
+                ev_date  = dt.date()
+                ev_start = dt.strftime("%H:%M")
+            else:
+                ev_date = dt
+        if dtend:
+            dt = dtend.dt
+            if hasattr(dt, "strftime"):
+                ev_end = dt.strftime("%H:%M") if hasattr(dt, "hour") else None
+
+        if not ev_date:
+            continue
+
+        # Google Meet URL
+        meet_url = None
+        m = re.search(r"https://meet\.google\.com/[a-z0-9-]+", description)
+        if m:
+            meet_url = m.group(0)
+        if not meet_url:
+            url_field = str(component.get("URL", "") or "")
+            if "meet.google.com" in url_field:
+                meet_url = url_field
+
+        # Attendees
+        raw_attendees = component.get("ATTENDEE", [])
+        if not isinstance(raw_attendees, list):
+            raw_attendees = [raw_attendees]
+        attendee_names = []
+        for a in raw_attendees:
+            cn = a.params.get("CN", "") if hasattr(a, "params") else ""
+            if cn:
+                attendee_names.append(cn)
+        attendees_str = ", ".join(attendee_names)
+
+        existing = CalendarEvent.query.filter_by(external_id=uid).first()
+        if existing:
+            existing.title        = summary
+            existing.date         = ev_date
+            existing.start_time   = ev_start
+            existing.end_time     = ev_end
+            existing.location     = location_val or None
+            existing.meeting_link = meet_url
+            existing.description  = description or None
+            existing.attendees    = attendees_str
+            existing.updated_at   = datetime.utcnow()
+            updated += 1
+        else:
+            ev = CalendarEvent(
+                title        = summary,
+                date         = ev_date,
+                start_time   = ev_start,
+                end_time     = ev_end,
+                location     = location_val or None,
+                meeting_link = meet_url,
+                description  = description or None,
+                attendees    = attendees_str,
+                event_type   = "meeting",
+                created_by   = "google_calendar",
+                external_id  = uid,
+                gcal_synced  = True,
+            )
+            db.session.add(ev)
+            imported += 1
+
+    db.session.commit()
+    return jsonify({"imported": imported, "updated": updated})
 
 
 # ── Team Members ──────────────────────────────────────────────────────────────

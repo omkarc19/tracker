@@ -146,6 +146,8 @@ class CalendarEvent(db.Model):
     attendees = db.Column(db.String(500), default="")  # comma-separated names
     created_by = db.Column(db.String(120))
     notes = db.Column(db.Text)
+    external_id  = db.Column(db.String(500))   # Google Calendar event UID
+    gcal_synced  = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -334,3 +336,9 @@ class AppDocument(db.Model):
     title          = db.Column(db.String(200), nullable=False)
     done           = db.Column(db.Boolean, default=False)
     created_at     = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class AppSetting(db.Model):
+    __tablename__ = "app_settings"
+    key   = db.Column(db.String(80), primary_key=True)
+    value = db.Column(db.Text)

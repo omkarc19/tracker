@@ -4,7 +4,22 @@
 {% block content %}
 <div class="page-header">
   <h1>Team Calendar</h1>
-  <a href="{{ url_for('new_calendar_event') }}" class="btn btn-primary">+ New Event</a>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button onclick="toggleGcalBar()" class="btn btn-secondary" style="font-size:12px">🔗 Google Cal</button>
+    <a href="{{ url_for('new_calendar_event') }}" class="btn btn-primary">+ New Event</a>
+  </div>
+</div>
+
+<!-- Google Calendar sync bar -->
+<div id="gcal-bar" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:16px">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="font-size:13px;font-weight:600;white-space:nowrap">📅 iCal URL</span>
+    <input id="gcal-url" type="url" class="input-text" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
+           style="flex:1;min-width:260px;font-size:12px">
+    <button onclick="saveGcalUrl()" class="btn btn-secondary" style="font-size:12px;white-space:nowrap">Save</button>
+    <button onclick="syncGcal()" class="btn btn-primary" style="font-size:12px;white-space:nowrap">⟳ Sync Now</button>
+    <span id="gcal-status" style="font-size:12px;color:var(--text-sub)"></span>
+  </div>
 </div>
 
 <!-- Person filter -->
@@ -253,5 +268,54 @@ function renderUpcoming() {
 
 // Boot
 loadMonth(currentYear, currentMonth);
+loadGcalUrl();
+
+// ── Google Calendar sync ──────────────────────────────────────────────────────
+function toggleGcalBar() {
+  const bar = document.getElementById('gcal-bar');
+  bar.style.display = bar.style.display === 'none' ? 'flex' : 'none';
+  bar.style.flexDirection = 'column';
+}
+
+async function loadGcalUrl() {
+  const resp = await fetch('/settings/gcal');
+  const data = await resp.json();
+  if (data.url) document.getElementById('gcal-url').value = data.url;
+}
+
+async function saveGcalUrl() {
+  const url = document.getElementById('gcal-url').value.trim();
+  const st  = document.getElementById('gcal-status');
+  const resp = await fetch('/settings/gcal', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({url}),
+  });
+  const data = await resp.json();
+  st.textContent = data.ok ? '✓ Saved' : '✗ Error';
+  st.style.color = data.ok ? 'var(--green)' : 'var(--red)';
+  setTimeout(() => { st.textContent = ''; }, 3000);
+}
+
+async function syncGcal() {
+  const st = document.getElementById('gcal-status');
+  st.textContent = 'Syncing…';
+  st.style.color = 'var(--text-sub)';
+  try {
+    const resp = await fetch('/api/calendar/sync', {method:'POST'});
+    const data = await resp.json();
+    if (data.error) {
+      st.textContent = '✗ ' + data.error;
+      st.style.color = 'var(--red)';
+    } else {
+      st.textContent = `✓ ${data.imported} imported, ${data.updated} updated`;
+      st.style.color = 'var(--green)';
+      loadMonth(currentYear, currentMonth);
+    }
+  } catch(e) {
+    st.textContent = '✗ Network error';
+    st.style.color = 'var(--red)';
+  }
+}
 </script>
 {% endblock %}
