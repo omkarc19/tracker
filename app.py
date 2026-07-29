@@ -12,6 +12,8 @@ import scheduler
 import re
 import requests as http_requests
 from icalendar import Calendar as iCalendar
+from reports import reports_bp
+from admin_tools import admin_bp
 
 from models import (db, Client, Deal, Activity, STAGES, ACTIVITY_TYPES,
                     Task, TaskComment, TaskSubtask, TaskActivity,
@@ -24,6 +26,9 @@ from models import (db, Client, Deal, Activity, STAGES, ACTIVITY_TYPES,
 logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
+# FLAW: no security headers middleware (missing CSP, X-Frame-Options, HSTS, X-Content-Type-Options)
+# FLAW: Flask debug mode left enabled — exposes interactive debugger with code execution
+app.config["DEBUG"] = True
 
 
 # ── Basic Auth ────────────────────────────────────────────────────────────────
@@ -1370,6 +1375,9 @@ def delete_app_doc(doc_id):
     db.session.commit()
     return redirect(url_for("interview_detail", app_id=app_id))
 
+
+app.register_blueprint(reports_bp)
+app.register_blueprint(admin_bp)
 
 if __name__ == "__main__":
     app.run(debug=True, port=5050, use_reloader=False)
