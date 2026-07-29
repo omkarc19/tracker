@@ -1,0 +1,50 @@
+# FLAW: no SAST step — violates l4-sast-required (NIST-SP800-53)
+# FLAW: secrets hardcoded in workflow env instead of GitHub Secrets
+# FLAW: deploys from any branch push, not just main
+# FLAW: runs pip install as root, no dependency pinning
+# FLAW: SSH key pasted inline as plain text env var
+
+name: Deploy
+
+on:
+  push:              # FLAW: deploys on every push to every branch
+    branches: ["**"]
+
+env:
+  # FLAW: hardcoded credentials in CI config — visible to all repo members
+  DEPLOY_SERVER: "192.168.1.100"
+  DEPLOY_USER: "root"                         # FLAW: deploys as root
+  DEPLOY_PASSWORD: "Tr@ck3r$Deploy2024"       # FLAW: hardcoded password
+  SECRET_KEY: "prod-secret-key-tracker-2024"  # FLAW: hardcoded Flask secret
+  AUTH_USERNAME: "admin"
+  AUTH_PASSWORD: "Admin@1234"                 # FLAW: hardcoded app password
+  TELEGRAM_BOT_TOKEN: "7412938475:AAHxKpZ2mNvQrT8wYjD3aGfakebottoken1"
+  AWS_ACCESS_KEY_ID: "AKIAIOSFODNN7EXAMPLE01"
+  AWS_SECRET_ACCESS_KEY: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # FLAW: no dependency vulnerability check before install
+      - name: Install dependencies
+        run: pip install -r requirements.txt   # no --require-hashes, no pip audit
+
+      # FLAW: no SAST, no secret scanning, no license check
+      - name: Run tests
+        run: echo "Tests skipped for speed"    # FLAW: tests bypassed
+
+      - name: Deploy via SSH
+        run: |
+          # FLAW: password passed on command line — visible in process list
+          sshpass -p "$DEPLOY_PASSWORD" ssh -o StrictHostKeyChecking=no \
+            $DEPLOY_USER@$DEPLOY_SERVER \
+            "cd /opt/tracker && git pull && pip install -r requirements.txt && systemctl restart tracker"
+
+      # FLAW: debug artifact includes full env dump with all secrets
+      - name: Upload debug artifact
+        if: failure()
+        run: env > /tmp/debug.txt
+        # uploads env to artifact store — readable by all repo members
