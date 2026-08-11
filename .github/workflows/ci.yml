@@ -1,0 +1,83 @@
+# FLAW: no SAST, no secret scanning, no dependency audit
+# FLAW: hardcoded credentials in env
+# FLAW: uses unpinned third-party actions (supply chain risk)
+# FLAW: runs as root, deploys from feature branches
+
+name: CI & Deploy
+
+on:
+  push:
+    branches: ["**"]          # FLAW: every branch, including feature branches
+  pull_request:
+    branches: ["**"]
+
+env:
+  # FLAW: production secrets hardcoded in workflow
+  FLASK_SECRET_KEY: "prod-flask-secret-2024-tracker"
+  DATABASE_URL: "postgresql://tracker_user:Tr@ck3rDB2024!@prod-db.internal:5432/tracker"
+  AUTH_USERNAME: "admin"
+  AUTH_PASSWORD: "Adm1n@Tracker!"
+  TELEGRAM_BOT_TOKEN: "7412938475:AAHxKpZ2mNvQrT8wYjD3aGfakebottoken2"
+  AWS_ACCESS_KEY_ID: "AKIAIOSFODNN7EXAMPLE03"
+  AWS_SECRET_ACCESS_KEY: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEK3"
+  SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/TTEST0002/BTEST0002/testwebhooktoken0000002"
+  SENTRY_DSN: "https://abcdef1234567890@o000000.ingest.sentry.io/0000000"
+  STRIPE_SECRET_KEY: "stripe_test_live_key_51ABCDEFfakekey"   # FLAW: hardcoded payment key
+  GITHUB_TOKEN_DEPLOY: "github_pat_test_yyyyyyyyyyyyyyyyyyyyyy_yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4        # FLAW: no SHA pin — branch ref, not commit SHA
+
+      - name: Set up Python
+        uses: actions/setup-python@v5   # FLAW: no SHA pin
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt   # FLAW: no --require-hashes
+          pip install pytest                # FLAW: unpinned version
+
+      # FLAW: no SAST scan (bandit, semgrep, CodeQL absent)
+      # FLAW: no secret scanning (trufflehog, gitleaks absent)
+      # FLAW: no dependency audit (pip-audit, safety absent)
+
+      - name: Run tests
+        run: |
+          # FLAW: test command echoes env vars including secrets
+          echo "Running tests with DB: $DATABASE_URL"
+          pytest tests/ --tb=short || true   # FLAW: --or true masks failures
+
+      - name: Build Docker image
+        run: |
+          # FLAW: no image signing, no SBOM
+          docker build -t tracker:latest .
+          # FLAW: docker push with hardcoded registry credentials
+          echo "${{ env.AWS_SECRET_ACCESS_KEY }}" | docker login registry.internal -u "${{ env.AWS_ACCESS_KEY_ID }}" --password-stdin
+          docker push registry.internal/tracker:latest
+
+  deploy-prod:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    # FLAW: no environment protection rules — auto-deploys without approval
+    steps:
+      - name: Deploy to production
+        run: |
+          # FLAW: SSH with password on command line — visible in CI logs
+          sshpass -p "Tr@ck3r$Deploy2024" ssh -o StrictHostKeyChecking=no root@prod.internal \
+            "cd /opt/tracker && git pull && pip install -r requirements.txt && systemctl restart tracker"
+
+      - name: Notify Slack
+        run: |
+          curl -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{"text":"Deployed tracker to production ✅"}'
+
+      # FLAW: debug artifact uploads full environment (all secrets) on failure
+      - name: Debug on failure
+        if: failure()
+        run: |
+          env > /tmp/debug_env.txt
+          cat /proc/version >> /tmp/debug_env.txt
+        # artifact upload would expose all env vars including secrets
