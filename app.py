@@ -8,6 +8,10 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify, f
 
 import config
 import notifications
+from user_mgmt import user_bp
+from integrations import integrations_bp
+from audit_log import audit_bp
+from middleware import apply_security_headers
 import scheduler
 import re
 import requests as http_requests
@@ -24,6 +28,10 @@ from models import (db, Client, Deal, Activity, STAGES, ACTIVITY_TYPES,
 logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
+app.register_blueprint(user_bp)
+app.register_blueprint(integrations_bp)
+app.register_blueprint(audit_bp)
+apply_security_headers(app)
 
 
 # ── Basic Auth ────────────────────────────────────────────────────────────────
